@@ -1,0 +1,23 @@
+:root{--bg:#0b1118;--bg2:#0f1720;--card:#131d28;--fg:#eef2f6;--mut:#9fb0c0;--line:#243241;--acc:#2f7bf6;--ok:#3ecf8e;--warn:#ffb86b}
+*{box-sizing:border-box}html{scroll-behavior:smooth}@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:#8fb8ff}section{max-width:1080px;margin:0 auto;padding:56px 16px}section.band{max-width:none;background:var(--bg2)}section.band>*{max-width:1048px;margin-left:auto;margin-right:auto}
+h1{font-size:clamp(32px,5vw,52px);line-height:1.08;letter-spacing:-.02em;margin:8px 0 16px}h2{font-size:28px;letter-spacing:-.01em;margin:0 0 20px}h3{font-size:18px;margin:0 0 6px}p{margin:0 0 12px}
+.top{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;background:#0b1118e6;backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:8px;color:var(--fg);font-weight:700;text-decoration:none}nav{display:flex;gap:16px;flex-wrap:wrap}nav a{color:var(--mut);text-decoration:none;font-size:15px}nav a:hover{color:var(--fg)}
+@media (max-width:640px){nav a:not(:last-child){display:none}}
+.hero{display:grid;grid-template-columns:1.2fr 1fr;gap:40px;align-items:center;padding-top:64px}@media (max-width:820px){.hero{grid-template-columns:1fr}}
+.eyebrow{color:var(--ok);font-weight:600;font-size:14px}.hl{background:linear-gradient(90deg,#6ea8ff,var(--ok));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{color:var(--mut);font-size:18px}.small{color:var(--mut);font-size:14px}.note{color:var(--mut)}
+.cta{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0 12px}.btn{display:inline-flex;align-items:center;min-height:48px;padding:0 20px;border-radius:12px;border:1px solid var(--line);color:var(--fg);text-decoration:none;font-weight:600}.btn.primary{background:var(--acc);border-color:var(--acc)}.btn:hover{filter:brightness(1.1)}
+.live{margin:0;background:#fff;border-radius:20px;padding:18px;box-shadow:0 20px 60px #0008,0 0 0 1px #ffffff20;text-align:center}.live canvas{width:100%;max-width:420px;aspect-ratio:1;image-rendering:pixelated;display:block;margin:auto}.live figcaption{color:#334;font-size:13px;margin-top:8px;font-variant-numeric:tabular-nums}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media (max-width:820px){.grid3,.grid2{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}.card p,.card li{color:var(--mut)}.card ul{margin:0;padding-left:18px}
+.good{border-top:3px solid var(--ok)}.bad{border-top:3px solid var(--warn)}
+.steps{list-style:none;padding:0;margin:0 0 16px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}@media (max-width:820px){.steps{grid-template-columns:1fr}}
+.steps li{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}.steps li>b{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--acc);margin-bottom:10px}.steps p{color:var(--mut)}
+video{width:100%;max-width:960px;display:block;border-radius:14px;background:#000;margin:8px auto 12px;aspect-ratio:16/9}
+.spec{width:100%;border-collapse:collapse}.spec th,.spec td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}.spec th{width:160px;color:var(--mut);font-weight:600}@media (max-width:640px){.spec th,.spec td{display:block;width:auto;border:0;padding:4px 0}.spec tr{display:block;padding:8px 0;border-bottom:1px solid var(--line)}}
+.checks{padding-left:20px}.checks li{margin:0 0 8px;color:var(--mut)}code{background:#ffffff12;padding:1px 6px;border-radius:5px;overflow-wrap:anywhere}
+details{border-bottom:1px solid var(--line);padding:12px 0}summary{cursor:pointer;font-weight:600}details p{color:var(--mut);margin:8px 0 0}
+footer{text-align:center;color:var(--mut);padding:32px 16px;border-top:1px solid var(--line)}

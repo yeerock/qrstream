@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>QRStream</title><meta name="description" content="Send any file from a screen to a phone as a video of QR codes. One way, no network, no pairing, no upload. Fountain coded and SHA-256 checked. Open source.">
+<meta name="theme-color" content="#0f1720"><link rel="icon" href="icon.svg"><link rel="stylesheet" href="site.css"></head>
+<body>
+<header class="top"><a class="brand" href="./"><img src="icon.svg" alt="" width="28" height="28">QRStream</a><nav><a href="#how">How</a><a href="#use">Use cases</a><a href="#when">When</a><a href="#demo">Demo</a><a href="https://github.com/yeerock/qrstream">GitHub</a></nav></header>
+
+<section class="hero">
+  <div class="copy">
+    <p class="eyebrow">Open source · MIT · Zero dependencies · Runs in any browser</p>
+    <h1>Move a file from a screen to a phone <span class="hl">with only light.</span></h1>
+    <p class="lead">QRStream plays any file as a video of QR codes. A phone films the screen and rebuilds the file, checks it with SHA-256 and keeps it. No Wi-Fi, no Bluetooth, no cable, no pairing, no account, no upload.</p>
+    <div class="cta"><a class="btn primary" href="send/">Send a file</a><a class="btn" href="receive/">Receive on this phone</a></div>
+    <p class="small">Try it now: open <b>Send</b> on a computer and <b>Receive</b> on a phone, tap <i>Use a demo picture</i>, point the camera.</p>
+  </div>
+  <figure class="live" aria-label="A live QR stream made by the same code the sender uses"><canvas id="hero" width="80" height="80"></canvas><figcaption id="herocap">Live stream · every code is new</figcaption></figure>
+</section>
+
+<section id="what" class="band"><h2>What it is</h2>
+  <div class="grid3">
+    <div class="card"><h3>A one-way data link</h3><p>The sender only shows pictures; the receiver only looks. Nothing travels back, so there is nothing to pair, connect or attack over a network.</p></div>
+    <div class="card"><h3>Loss does not matter</h3><p>Every frame carries fresh fountain-coded data. Blur, glare or a missed frame costs a little time, never a restart. Any set of symbols about 2 % larger than the file rebuilds it.</p></div>
+    <div class="card"><h3>Checked and private</h3><p>Every frame has a CRC-32, the whole file a SHA-256. The file stays in the receiving browser; it can be opened, saved, or handed to the phone's own share sheet.</p></div>
+  </div>
+</section>
+
+<section id="how"><h2>How to use it</h2>
+  <ol class="steps">
+    <li><b>1</b><h3>Pick a file on the sender</h3><p>Open <a href="send/">Send</a> on the screen that holds the file (a kiosk, a lab PC, a laptop) and choose a file, or a demo file.</p></li>
+    <li><b>2</b><h3>Film the screen</h3><p>The stream starts with a link code: scan it with the phone camera to open the receiver, then tap <i>Start Camera</i>. Hold still so the whole code is in the frame.</p></li>
+    <li><b>3</b><h3>Open, save or share</h3><p>The percent climbs on the phone. When the file checks out it is shown right in the camera box with <i>Open, Save, Share, Email</i>. Share uses the phone's own share sheet (AirDrop, Messages, WhatsApp, Files, Drive...).</p></li>
+  </ol>
+  <p class="note">No camera at hand? Record the screen with any phone, then use <i>Use a Video of the Code</i> on the receiver.</p>
+</section>
+
+<section id="use" class="band"><h2>Use cases</h2>
+  <div class="grid3 uc">
+    <div class="card"><h3>Isolated and secure systems</h3><p>Take a report or log off a machine that must never join a network, without USB sticks that carry malware the other way.</p></div>
+    <div class="card"><h3>Kiosks, HMIs and embedded screens</h3><p>Industrial panels, CCTV/NVR monitors, medical carts and point-of-sale screens that have a display but no friendly way to export.</p></div>
+    <div class="card"><h3>Field work with no signal</h3><p>Mines, ships, plants, basements and remote sites: the receiver works offline after one visit (it installs as a web app).</p></div>
+    <div class="card"><h3>Evidence and incident capture</h3><p>Hand a camera still, a short clip or a PDF to an inspector's phone on the spot, with a SHA-256 that proves it was not changed.</p></div>
+    <div class="card"><h3>Guests and BYOD</h3><p>Give a visitor a file without giving them your Wi-Fi password, an app, or an email address.</p></div>
+    <div class="card"><h3>Demos, classrooms, events</h3><p>Put a handout, a config or a ticket on a projector; everyone in the room films it at once. One sender, any number of receivers.</p></div>
+  </div>
+</section>
+
+<section id="when"><h2>When to use it, and when not</h2>
+  <div class="grid2">
+    <div class="card good"><h3>Good fit</h3><ul><li>Files up to a few MB: pictures, short clips, PDFs, Office files, logs, configs, keys.</li><li>There is a screen, a camera, and no shared network, or a network you must not use.</li><li>You want zero setup on the sender beyond a web page.</li><li>Many receivers at once.</li></ul></div>
+    <div class="card bad"><h3>Use something else</h3><ul><li>Large files (tens of MB and up): even at the peak of about 128 KB/s a 10 MB file needs well over a minute, and longer on a small screen.</li><li>You need the phone to send back to the screen: this link is one way by design.</li><li>The screen is very small or the camera very poor: use a lower density, or a cable.</li><li>Secret data on a screen others can film: anyone with a camera in view can receive it too.</li></ul></div>
+  </div>
+</section>
+
+<section id="demo" class="band"><h2>Demo</h2>
+  <p>The clip below is a real run made by the test suite: the sender's stream is filmed by a simulated camera (tilt, blur, noise, uneven light), Chrome uses that as its camera, and the real receiver rebuilds the file and checks its SHA-256. Nothing is faked.</p>
+  <video id="demovid" controls playsinline preload="metadata" poster="docs/demo-poster.png" src="docs/demo.webm"></video>
+  <p class="small">Live demo: <a href="send/?demo">sender with a demo picture</a> · <a href="receive/">receiver</a>.</p>
+</section>
+
+<section id="spec"><h2>Specifications</h2>
+  <table class="spec"><tbody>
+    <tr><th>Code</th><td>QR Model 2 (ISO/IEC 18004), alphanumeric mode, error level L, versions 15 to 40; own encoder</td></tr>
+    <tr><th>Payload text</th><td>Base45 (RFC 9285): 2 bytes in 3 QR alphanumeric characters</td></tr>
+    <tr><th>Erasure code</th><td>Systematic random linear fountain over GF(2) in generations of 1,024 blocks, interleaved source order, Gauss-Jordan decoding; 142-byte symbols fixed across densities. Measured overhead 1 to 4 % at 20 to 50 % frame loss</td></tr>
+    <tr><th>Frame</th><td>20-byte header (magic, version, stream id, length, seed, CRC-32) + up to 20 symbols = 2,840 bytes per code at QR v40; 1 to 3 codes side by side per screen</td></tr>
+    <tr><th>Smart mode</th><td>The sender measures its own screen, picks the densest layouts that stay readable, and weaves fast and safe frames into one stream (A A A B A A B C). The phone coaches the user only when needed. No settings.</td></tr>
+    <tr><th>Throughput</th><td>Raw per code: v40 at 15/s ≈ 42 KB/s. Up to 3 codes per screen and up to 30 screens per second (manual Extreme). Measured through the camera path: 300 KB random in 4.5 s with Smart on a 1080p screen (65 KB/s); 128 to 137 KB/s at 3 codes and 30 screens/s; a 334 KB log in 0.9 s thanks to gzip</td></tr>
+    <tr><th>Integrity</th><td>CRC-32 per frame, SHA-256 of the file</td></tr>
+    <tr><th>Reader</th><td>Own QR reader in Web Workers: local-threshold binarisation, finder search, timing-pattern sizing, incremental alignment-grid lock with least-squares homography, per-cell maps, Reed-Solomon (Berlekamp-Massey, Forney). About 25 ms for three v40 codes in a 1080p picture</td></tr>
+    <tr><th>Limits</th><td>Sender 10 MB; receiver refuses streams over 16 MB</td></tr>
+    <tr><th>Browsers</th><td>Sender: any modern browser. Receiver: Chrome, Edge, Firefox, Safari (iOS 15+) with a camera; https or localhost. PDFs open in the device's own viewer</td></tr>
+  </tbody></table>
+</section>
+
+<section id="security" class="band"><h2>Security and privacy</h2>
+  <ul class="checks">
+    <li>No server: both pages are static files. The receiver makes no network request with your data (strict Content-Security-Policy, <code>connect-src 'self'</code>).</li>
+    <li>Received files are typed defensively: HTML, SVG, XML and scripts are opened as plain text, never run in the page.</li>
+    <li>Forged frames are rejected (magic, CRC-32), a forged length over 16 MB is ignored, previews skip zip entries over 20 MB.</li>
+    <li>Zero third-party code: the QR encoder and reader, the erasure code and the previews are all written in this project. Nothing is loaded from a CDN.</li>
+    <li>Optical links are visible: treat the screen like a printout. Anyone filming it can read it.</li>
+  </ul>
+</section>
+
+<section id="faq"><h2>FAQ</h2>
+  <details><summary>Does the phone need internet?</summary><p>Only once, to load the receiver. After that it starts from its offline cache. The transfer itself never uses a network.</p></details>
+  <details><summary>Why do some codes look different?</summary><p>There is no back channel, so the sender cannot ask the camera what it reads best. Smart mode mixes the fastest readable layout with safer ones in a single stream; every frame carries useful data, so a good camera runs near full speed and a weak one still finishes. Symbols have a fixed size, so nothing received is ever wasted.</p></details>
+  <details><summary>How do I make it faster?</summary><p>Nothing to set: Smart mode adapts to the screen. A larger or wider screen carries more codes at once; fill the camera view with it and avoid glare. Text-like files are compressed first automatically. For lab conditions there are manual Extreme levels (20 and 30 codes per second).</p></details>
+  <details><summary>Can I save to the photo library on iPhone?</summary><p>A web page cannot write there itself. The receiver opens the iOS share sheet, where you choose Save Image, Save Video or Save to Files.</p></details>
+  <details><summary>Can I embed the sender in my own product?</summary><p>Yes. <code>core/qrtx.js</code> is one dependency-free file; see the README for the API. MIT licence.</p></details>
+</section>
+
+<footer><p>QRStream · MIT licence · <a href="docs/METHODOLOGY.md">Methodology</a> · <a href="https://github.com/yeerock/qrstream">Source</a></p></footer>
+<script src="core/qrtx.js"></script><script src="site.js"></script>
+</body></html>

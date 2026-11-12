@@ -1,0 +1,42 @@
+<!doctype html><meta charset="utf-8"><title>compose</title>
+<body style="margin:0;background:#0b1118"><canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// Demo video composer (own code): draws title cards, the sender stream (real module bitmaps) and the real receiver screenshots
+// onto one 1920x1080 canvas and records it with the browser's own MediaRecorder. Driven by demo/make-demo.mjs.
+window.compose = async (rxCount, rxFps, title) => {
+  const c = document.getElementById('c'), x = c.getContext('2d'), S = await (await fetch('out/sender.json')).json();
+  const rx = []; for (let i = 0; i < rxCount; i++) { const im = new Image(); im.src = `out/rx/${String(i).padStart(4, '0')}.png`; rx.push(im); }
+  await Promise.all(rx.map(i => i.decode().catch(() => {})));
+  const font = (w, s) => `${w} ${s}px system-ui,-apple-system,Segoe UI,sans-serif`;
+  const center = (t, y, s, col = '#eef2f6', w = 700) => { x.font = font(w, s); x.fillStyle = col; x.textAlign = 'center'; x.fillText(t, 960, y); };
+  const grad = (t, y, s) => { x.font = font(800, s); const m = x.measureText(t).width, g = x.createLinearGradient(960 - m / 2, 0, 960 + m / 2, 0); g.addColorStop(0, '#6ea8ff'); g.addColorStop(1, '#3ecf8e'); x.fillStyle = g; x.textAlign = 'center'; x.fillText(t, 960, y); };
+  const bg = () => { x.fillStyle = '#0b1118'; x.fillRect(0, 0, 1920, 1080); };
+  const bitmap = (bm, X, Y, size) => { const k = Math.floor(size / bm.h), w = bm.w * k, h = bm.h * k, im = x.createImageData(bm.w, bm.h), d = new Uint32Array(im.data.buffer);
+    for (let i = 0; i < bm.w * bm.h; i++) d[i] = bm.b.charCodeAt(i) === 49 ? 0xFF000000 : 0xFFFFFFFF;
+    const t = document.createElement('canvas'); t.width = bm.w; t.height = bm.h; t.getContext('2d').putImageData(im, 0, 0); x.imageSmoothingEnabled = false; x.fillStyle = '#fff';
+    const W2 = Math.min(w, 1100), H2 = h * W2 / w; x.fillRect(X - 16, Y - 16, W2 + 32, H2 + 32); x.drawImage(t, X, Y, W2, H2); };
+  const scenes = [
+    [3, () => { bg(); center('QRStream', 430, 110, '#eef2f6', 800); grad('Send a file from a screen to a phone with only light', 540, 46); center('No Wi-Fi · no Bluetooth · no cable · no pairing · no upload · no library', 620, 32, '#9fb0c0', 500); }],
+    [5, () => { bg(); center('How it works', 300, 72, '#eef2f6', 800);
+      ['1. The sender turns the file into an endless stream of QR codes (fountain code)', '2. Smart mode mixes fast and safe codes; missed frames never need resending', '3. The phone reads them with its own QR reader, checks SHA-256, shares to any app']
+        .forEach((t, i) => center(t, 430 + i * 80, 34, '#9fb0c0', 500)); }],
+  ];
+  const stream = c.captureStream(30), rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 6e6 }), parts = [];
+  rec.ondataavailable = e => e.data.size && parts.push(e.data); rec.start(500);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  for (const [sec, draw] of scenes) { draw(); await sleep(sec * 1000); }
+  const n = Math.ceil(rxCount / rxFps * 30);   // main scene at 30 fps, receiver at its real capture rate
+  for (let f = 0; f < n; f++) {
+    bg(); x.font = font(700, 34); x.fillStyle = '#eef2f6'; x.textAlign = 'center'; x.fillText('SENDER · any screen, Smart mode', 640, 70); x.fillText('RECEIVER · phone browser', 1560, 70);
+    bitmap(S[Math.min(S.length - 1, Math.floor(f / 2))], 90, 130, 820);
+    const im = rx[Math.min(rx.length - 1, Math.floor(f * rxFps / 30))]; if (im.naturalWidth) { const h = 880, w = im.naturalWidth * h / im.naturalHeight; x.drawImage(im, 1560 - w / 2, 120, w, h); }
+    x.font = font(500, 26); x.fillStyle = '#9fb0c0'; x.fillText('Real run: the receiver films the stream through its camera and decodes it with our own QR reader', 960, 1045);
+    await sleep(1000 / 30);
+  }
+  bg(); grad('Transfer verified', 440, 96); center(title, 530, 40, '#9fb0c0', 500); center('Open source · MIT · zero dependencies · github.com/yeerock/qrstream', 610, 34, '#9fb0c0', 500); center('Try it: yeerock.github.io/qrstream', 670, 34, '#9fb0c0', 500);
+  await sleep(4000);
+  const poster = c.toDataURL('image/png'); rec.stop(); await new Promise(r => rec.onstop = r);
+  const buf = new Uint8Array(await new Blob(parts, { type: 'video/webm' }).arrayBuffer()); let s = ''; for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode(...buf.subarray(i, i + 32768));
+  return { webm: btoa(s), poster };
+};
+</script>

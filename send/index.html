@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>QRStream Sender</title><meta name="description" content="Send any file to a phone as a video of QR codes. No network, no pairing, no upload."><meta name="theme-color" content="#0f1720"><link rel="icon" href="../icon.svg"><link rel="stylesheet" href="send.css"></head>
+<body>
+<main id="pickview">
+  <p class="crumb"><a href="../">QRStream</a></p>
+  <h1>Send a file</h1>
+  <p class="lead">Pick a file. This screen turns it into a stream of QR codes. Film it with the receiver on any phone. The file never leaves this page except as light.</p>
+  <label id="drop" class="drop" tabindex="0"><input id="file" type="file" hidden><b>Choose a file</b><span>or drop it here. Up to 10 MB. Small files arrive in seconds.</span></label>
+  <div class="row"><button id="demo" class="secondary">Use a demo picture</button><button id="demotxt" class="secondary">Use a demo text file</button></div>
+  <p id="err" class="msg" role="alert"></p>
+  <details><summary>How it works</summary><ol><li>Open the receiver on the phone: scan the code shown when the stream starts, or go to <code id="rx"></code>.</li><li>Tap Start Camera and hold the phone so the whole code is in the frame.</li><li>Missed codes do not matter: every code is new (fountain code), and any set slightly larger than the file rebuilds it.</li><li>The phone checks SHA-256, then shows the file with Open, Save, Share and Email.</li></ol></details>
+</main>
+<div id="play" hidden role="dialog" aria-label="Sending">
+  <div id="stage"><canvas id="qr" aria-label="QR code stream"></canvas></div>
+  <div id="bar">
+    <div class="info"><b id="fname"></b><span id="fstat"></span></div>
+    <div class="ctl">
+      <label>Density <select id="lvl"><option value="auto">Smart (auto)</option><option value="0">Extreme+ (v40, 30/s)</option><option value="1">Extreme (v40, 20/s)</option><option value="2">Turbo (v40, 15/s)</option><option value="3">Max (v40, 12/s)</option><option value="4">High (v33, 12/s)</option><option value="5">Medium (v25, 10/s)</option><option value="6">Low (v15, 8/s)</option></select></label>
+      <label>Codes <select id="k"><option value="auto">Auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+      <button id="pause">Pause</button><button id="fs">Full screen</button><button id="close" class="primary">Stop</button>
+    </div>
+  </div>
+</div>
+<script src="../core/qrtx.js"></script><script src="send.js"></script>
+</body></html>

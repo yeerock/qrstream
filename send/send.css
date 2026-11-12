@@ -1,0 +1,16 @@
+:root{--bg:#0f1720;--fg:#f3f6f9;--mut:#a8b3bf;--line:#2c3743;--acc:#2f7bf6;--ok:#3ecf8e}
+*{box-sizing:border-box}[hidden]{display:none!important}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:640px;margin:auto;padding:24px 16px 48px}h1{font-size:28px;margin:4px 0 8px}.lead{color:var(--mut);margin:0 0 20px}
+.crumb{margin:0;font-size:14px}.crumb a{color:var(--mut);text-decoration:none}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:180px;border:2px dashed var(--line);border-radius:14px;cursor:pointer;text-align:center;padding:20px;transition:border-color .2s,background .2s}
+.drop:hover,.drop.on,.drop:focus-visible{border-color:var(--acc);background:#2f7bf612;outline:0}.drop b{font-size:18px}.drop span{color:var(--mut);font-size:14px}
+.row{display:flex;gap:8px;margin:12px 0}.row button{flex:1}
+button,select{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--fg);font:600 15px system-ui,sans-serif;cursor:pointer}
+.primary{background:var(--acc);border-color:var(--acc);color:#fff}.msg{color:#ffb4a8}
+details{margin-top:20px;color:var(--mut)}summary{cursor:pointer;color:var(--fg)}code{background:#ffffff14;padding:1px 6px;border-radius:5px;overflow-wrap:anywhere}
+#play{position:fixed;inset:0;display:flex;flex-direction:column;background:#fff}
+#stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#fff}
+#qr{image-rendering:pixelated;image-rendering:crisp-edges}
+#bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--bg)}
+.info{display:flex;flex-direction:column;min-width:0}.info b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.info span{color:var(--mut);font-size:14px;font-variant-numeric:tabular-nums}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ctl label{color:var(--mut);font-size:14px;display:flex;gap:6px;align-items:center}select{background:var(--bg)}
