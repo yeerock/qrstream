@@ -7,7 +7,8 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/ja
  *  then the promise rejects with a plain message: an 'error' event nobody listens to would end Node with a bare stack trace instead. */
 export function serve(port = 8787) {
   const s = http.createServer((q, r) => {
-    let p; try { p = decodeURIComponent(new URL(q.url, 'http://x').pathname); } catch (e) { r.writeHead(400).end(); return; } if (p.endsWith('/')) p += 'index.html';
+    let p; try { p = decodeURIComponent(new URL(q.url, 'http://x').pathname); } catch (e) { r.writeHead(400).end(); return; } if (p.includes('\0') || /(^|\/)\.[^/]/.test(p)) { r.writeHead(400).end(); return; }   // no NUL bytes, no dot-files such as /.git
+    if (p.endsWith('/')) p += 'index.html';
     const f = path.join(ROOT, p); if (f !== ROOT && !f.startsWith(ROOT + path.sep)) { r.writeHead(403).end(); return; }
     fs.readFile(f, (e, b) => { if (e) { r.writeHead(404).end('not found'); return; } r.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); r.end(b); });
   });

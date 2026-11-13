@@ -9,7 +9,7 @@
   const LEVELS = [[40, 30], [40, 20], [40, 15], [40, 12], [33, 12], [25, 10], [15, 8]];   // QR version, codes per second (per code slot)
   const MAX = 10 * 1048576, RECEIVER = new URL('../receive/?go', location.href).href;
   const P = new URLSearchParams(location.search), TEST = P.has('test');   // test mode: frames advance only when the test asks (deterministic recording)
-  const sz = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  const sz = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1000 ? Math.round(n / 1024) + ' KB' : Math.max(0, Math.round(n)) + ' bytes';
   $('rx').textContent = RECEIVER.replace('?go', '');
 
   /** One or more codes in a row or a grid (cols per row), one pixel per module, with a 4-module quiet zone around and between them (ISO/IEC 18004 7.3.8). */
@@ -66,52 +66,73 @@
       // a module must be big enough in device pixels (sharp) and in CSS pixels (physical size: a phone screen has 3 device pixels per CSS pixel)
       const best = (minPx, below = Infinity, css = 0) => opts.filter(o => o.px >= minPx && o.px / dpr() >= css && o.cap < below).sort((a, b) => b.cap - a.cap || a.k - b.k)[0];
       const A = best(4, Infinity, 2.5) || best(3) || opts[opts.length - 1], B = best(5, A.cap, 3) || A, C = best(7, B.cap, 3.5) || B;
-      plan = [[A, 15], [A, 15], [A, 15], [B, 12], [A, 15], [A, 15], [B, 12], [C, 10]];
+      const tb = B === A ? 1 : 2, tc = C === B ? tb : 3;   // the tier travels in every frame, so the receiver's coach knows which kind it is reading
+      plan = [[A, 15, 1], [A, 15, 1], [A, 15, 1], [B, 12, tb], [A, 15, 1], [A, 15, 1], [B, 12, tb], [C, 10, tc]];
+    }
+    /** Codes choices that give no readable layout on this screen at this density are switched off; a chosen one that stops fitting goes back to Auto, with a note. */
+    let kNote = '', kNoteUntil = 0;
+    function refreshK() {
+      const fits = n => smart() ? VERS.some(v => GRIDS.some(([c, r]) => c * r === n && modPx(v, c, r) >= 3 && modPx(v, c, r) / dpr() >= 2 && filmable(v, c, r)))
+        : GRIDS.some(([c, r]) => c * r === n && modPx(LEVELS[+$('lvl').value][0], c, r) >= 3 && filmable(LEVELS[+$('lvl').value][0], c, r));
+      for (const o of $('k').options) if (o.value !== 'auto') o.disabled = !fits(+o.value);
+      if (kFix() && $('k').selectedOptions[0].disabled) { kNote = `${kSel()} codes do not fit this screen at this density. Using Auto.`; kNoteUntil = performance.now() + 6000; $('k').value = 'auto'; }
     }
     let slot = 0;
     const smart = () => $('lvl').value === 'auto';
     const cur = () => {
-      if (smart()) { const [o, fps] = plan[slot % plan.length]; return { v: o.v, k: o.k, c: o.c, fps }; }
+      if (smart()) { const [o, fps, tier] = plan[slot % plan.length]; return { v: o.v, k: o.k, c: o.c, fps, tier }; }
       const [v, fps] = LEVELS[+$('lvl').value];
       // a fixed density: the layout with the most codes whose modules are still at least 3 device pixels
-      const g = grids().filter(([c, r]) => modPx(v, c, r) >= 3 && filmable(v, c, r)).sort((a, b) => b[0] * b[1] - a[0] * a[1] || a[1] - b[1])[0] || (kFix() ? grids()[0] : [1, 1]);
-      return { v, k: g[0] * g[1], c: g[0], fps };
+      const g = grids().filter(([c, r]) => modPx(v, c, r) >= 3 && filmable(v, c, r)).sort((a, b) => b[0] * b[1] - a[0] * a[1] || a[1] - b[1])[0] || [1, 1];   // never a layout that cannot be read
+      return { v, k: g[0] * g[1], c: g[0], fps, tier: 0 };
     };
     const shape = (k, c) => k === c ? `${k}\u00d7` : `${c} by ${k / c} grid of`;
     const clock = t => { t = Math.floor(t / 1000); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
     const stat = () => {
       const { v, k, fps } = cur(); let rate;
-      if (smart()) { rate = plan.reduce((a, [o, f]) => a + o.cap * f, 0) / plan.length; } else rate = k * QRTX.symbolsIn(v) * QRTX.SYMBOL * fps;
-      const head = smart() ? `Smart: ${shape(plan[0][0].k, plan[0][0].c)} v${plan[0][0].v} at 15/s, with safer frames woven in` : `${shape(k, cur().c)} QR v${v} \u00b7 ${fps}/s`, pass = syms / need, secs = Math.max(1, Math.ceil(data.length * 1.02 / rate));
-      $('fstat').textContent = paused ? (frames ? 'Paused' : 'Ready. Press Start stream.') : `Showing for ${clock(shownMs)} \u00b7 pass ${Math.floor(pass) + 1} \u00b7 a phone needs about ${secs} s of clear view`;
-      $('fdet').textContent = `${sz(file.size)}${zipped ? ' (gzip ' + sz(data.length) + ')' : ''} \u00b7 ${head} \u00b7 up to ${sz(rate)}/s \u00b7 check code ${meta.sha256.slice(0, 4)} ${meta.sha256.slice(4, 8)}`;
-      $('fok').hidden = pass < 1; $('play').classList.toggle('enough', pass >= 1);
+      // bytes per second when every code is read: the slots of the weave last 1/15, 1/12 and 1/10 s, so it is bytes of one round over the time of one round
+      const round = plan.reduce((a, [, f]) => a + 1 / f, 0);
+      if (smart()) rate = plan.reduce((a, [o]) => a + o.cap, 0) / round; else rate = k * QRTX.symbolsIn(v) * QRTX.SYMBOL * fps;
+      const head = smart() ? `Smart: ${shape(plan[0][0].k, plan[0][0].c)} v${plan[0][0].v}, about ${Math.round(plan.length / round)} screens a second, with safer frames woven in` : `${shape(k, cur().c)} QR v${v} \u00b7 ${fps}/s`, pass = syms / need, secs = Math.max(1, Math.ceil(data.length * 1.02 / rate));
+      const set = (id, t) => { const e = $(id); if (e.textContent !== t) e.textContent = t; };
+      set('fstat', paused ? (frames ? 'Paused' : "Ready. Scan this code with the phone's camera to open the receiver, then press Start stream.") : entryOn ? "Scan this code with the phone's camera to open the receiver. The file starts in a moment." : `Showing for ${clock(shownMs)}${pass >= 2 ? ` \u00b7 shown ${Math.floor(pass)} times over` : ''} \u00b7 a phone needs about ${secs} s of clear view`);
+      set('fdet', performance.now() < kNoteUntil ? kNote : `${sz(file.size)}${zipped ? ' (gzip ' + sz(data.length) + ')' : ''} \u00b7 ${head} \u00b7 up to ${sz(rate)}/s`);
+      $('fdet').title = $('fdet').textContent;
+      $('play').classList.toggle('enough', pass >= 1);
     };
-    $('lvl').onchange = $('k').onchange = () => { makePlan(); stat(); };
+    $('lvl').onchange = $('k').onchange = () => { refreshK(); makePlan(); stat(); };
+    let entryOn = true;   // the entry code is on the stage (the first 2.5 s, and for 5 s after a click on the corner code)
     const step = (forceEntry) => {
+      entryOn = !!forceEntry;
       if (forceEntry) { if (cv.width !== entry.size + 8) draw(cv, entry); }
-      else { const { v, k, c } = cur(), qs = []; for (let i = 0; i < k; i++) qs.push(QRTX.encode(s.next(v), { version: v, mask: 2 })); draw(cv, qs, 4, c); frames++; slot++; syms += k * QRTX.symbolsIn(v); }
+      else { const { v, k, c, tier } = cur(), qs = []; for (let i = 0; i < k; i++) qs.push(QRTX.encode(s.next(v, tier), { version: v, mask: 2 })); draw(cv, qs, 4, c); frames++; slot++; syms += k * QRTX.symbolsIn(v); }
       fit(cv); stat();
     };
     const tick = t => { timer = requestAnimationFrame(tick); if (paused) { last = t; return; } const dt = t - last; if (dt < 1000 / cur().fps - 2) return; if (last) shownMs += Math.min(dt, 500); last = t; step(t < bigUntil); };
     const setPause = p => { paused = p; $('pause').textContent = p ? (frames ? 'Resume' : 'Start stream') : 'Pause'; $('ssay').textContent = p ? 'Paused' : 'Stream playing'; stat(); };
-    $('fname').textContent = file.name; $('pickview').hidden = true; $('play').hidden = false; $('opts').open = innerWidth > 600; makePlan();   // measured on the visible stage
-    draw($('ecode'), entry); draw(cv, entry); fit(cv); setPause(still); $('pause').focus();
+    $('fname').textContent = file.name; $('pickview').hidden = true; $('play').hidden = false; $('opts').open = innerWidth > 600;
+    $('fchk').textContent = 'Check code ' + meta.sha256.slice(0, 16).match(/.{4}/g).join(' '); $('fchk').title = 'Start of the SHA-256 of the file. The receiver shows the same code for the same file.';
+    refreshK(); makePlan();   // measured on the visible stage
+    draw($('ecode'), entry); { const e = $('ecode'), m = Math.max(1, Math.floor(96 * dpr() / e.width)); e.style.width = e.style.height = (m * e.width / dpr()) + 'px'; }   // whole device pixels per module, like the stage
+    draw(cv, entry); fit(cv); setPause(still); $('pause').focus();
     if (TEST) { window.__qrsStep = n => { for (let i = 0; i < n; i++) step(); return frames; }; window.__qrsEntry = () => step(true); window.__qrsMeta = meta; window.__qrsGrab = () => { const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let b = ''; for (let i = 0; i < d.length; i += 4) b += d[i] < 128 ? '1' : '0'; return { w: cv.width, h: cv.height, b }; }; }
     else { const t0 = setTimeout(() => { timer = requestAnimationFrame(tick); }, still ? 0 : 2500); var early = () => clearTimeout(t0); }   // entry code first, so the phone can open the receiver
     try { if (navigator.wakeLock) wl = await navigator.wakeLock.request('screen'); } catch (e) { }
-    const onResize = () => { makePlan(); fit(cv); }; addEventListener('resize', onResize);
+    // the stage changes size when the window does, when Settings opens on a phone, and when the bar's text wraps: plan again each time, so modules never fall under the planned size
+    let sw = 0, sh = 0; const onResize = () => { const b = $('stage').getBoundingClientRect(); if (Math.abs(b.width - sw) < 1 && Math.abs(b.height - sh) < 1) return; sw = b.width; sh = b.height; if (innerWidth > 600) $('opts').open = true; refreshK(); makePlan(); fit(cv); };
+    addEventListener('resize', onResize); const ro = window.ResizeObserver ? new ResizeObserver(onResize) : null; if (ro) ro.observe($('stage'));
     const onShow = async () => { if (!document.hidden && navigator.wakeLock) { try { wl = await navigator.wakeLock.request('screen'); } catch (e) { } } }; document.addEventListener('visibilitychange', onShow);   // the lock is lost when the tab is hidden
-    stop = () => { cancelAnimationFrame(timer); if (early) early(); removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', onShow); $('ssay').textContent = 'Stopped'; if (wl) wl.release().catch(() => { }); if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); $('play').hidden = true; $('pickview').hidden = false; stop = null; $('drop').focus(); };
+    stop = () => { cancelAnimationFrame(timer); if (early) early(); removeEventListener('resize', onResize); if (ro) ro.disconnect(); document.removeEventListener('visibilitychange', onShow); $('ssay').textContent = 'Stopped'; if (wl) wl.release().catch(() => { }); if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); $('play').hidden = true; $('pickview').hidden = false; stop = null; $('drop').focus(); };
     $('pause').onclick = () => setPause(!paused);
     // a phone that arrives late and cannot scan the small corner code: show it large for 5 seconds
-    $('join').onclick = () => { bigUntil = performance.now() + 5000; if (paused || TEST) { draw(cv, entry); fit(cv); } };
+    $('join').onclick = () => { bigUntil = performance.now() + 5000; if (paused || TEST) { draw(cv, entry); fit(cv); entryOn = true; stat(); } };
     $('join').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); $('join').click(); } };
   }
   $('close').onclick = () => stop && stop();
   $('fs').onclick = () => { const p = $('play'); (document.fullscreenElement ? document.exitFullscreen() : p.requestFullscreen?.())?.catch?.(() => { }); };
   addEventListener('keydown', e => {
-    if (!stop || /^(BUTTON|SELECT|INPUT|TEXTAREA|SUMMARY)$/.test(e.target.tagName) && e.key !== 'Escape') return;
+    if (!stop) return; const tag = e.target.tagName;   // letters are skipped only where typing means something; Space on a button is that button's own click
+    if (e.key !== 'Escape' && (/^(SELECT|INPUT|TEXTAREA)$/.test(tag) || (e.key === ' ' && /^(BUTTON|SUMMARY)$/.test(tag)) || e.target.id === 'join')) return;
     if (e.key === 'Escape' && !document.fullscreenElement) stop();
     if (e.key === ' ') { e.preventDefault(); $('pause').click(); }
     if (e.key === 'f' || e.key === 'F') $('fs').click();
@@ -126,7 +147,8 @@
   addEventListener('drop', e => take([...e.dataTransfer.files]));
   // text: typed or pasted, sent as a small text file
   const textFile = t => new File([t], 'note.txt', { type: 'text/plain' });
-  $('sendtext').onclick = () => { const t = $('text').value; if (!t.trim()) { $('err').textContent = 'Type or paste some text first.'; return; } send(textFile(t)); };
+  $('text').oninput = () => { $('err').textContent = ''; };
+  $('sendtext').onclick = () => { const t = $('text').value; if (!t.trim()) { $('err').textContent = 'Type or paste some text first.'; $('text').focus(); return; } send(textFile(t)); };
   addEventListener('paste', e => {
     if (stop || !e.clipboardData) return;
     const fs = [...e.clipboardData.files]; if (fs.length) { e.preventDefault(); take(fs); return; }   // a copied picture or file

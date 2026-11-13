@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<script src="../guard.js?v=2.3.0"></script>
-<title>QRStream Sender</title><meta name="description" content="Send any file to a phone as a video of QR codes. No network, no pairing, no upload."><meta name="theme-color" content="#0f1720"><link rel="icon" href="../icon.svg"><link rel="apple-touch-icon" href="../icons/apple-touch-icon.png"><link rel="stylesheet" href="send.css?v=2.3.0"></head>
+<script src="../guard.js?v=2.3.1"></script>
+<title>QRStream Sender</title><meta name="description" content="Send any file to a phone as a video of QR codes. No network, no pairing, no upload."><meta name="theme-color" content="#0f1720"><link rel="icon" href="../icon.svg"><link rel="apple-touch-icon" href="../icons/apple-touch-icon.png"><link rel="stylesheet" href="send.css?v=2.3.1"></head>
 <body>
 <main id="pickview">
   <p class="crumb"><a href="../">QRStream <span class="by">by VYROX</span></a></p>
@@ -10,7 +10,7 @@
   <label id="drop" class="drop" tabindex="0"><input id="file" type="file" multiple hidden><b>Choose a file</b><span>or drop it anywhere on this page, or paste a copied picture. Up to 10 MB. Best for files up to a few MB; small files arrive in seconds.</span></label>
   <div class="row"><button id="demo" class="secondary">Use a demo picture</button><button id="demotxt" class="secondary">Use a demo text file</button></div>
   <p id="err" class="msg" role="alert"></p>
-  <details id="textbox"><summary>Send text instead</summary><label class="sr" for="text">Text to send</label><textarea id="text" rows="5" placeholder="Type or paste text: a password, a link, a note, a config"></textarea><button id="sendtext" class="secondary">Send this text</button></details>
+  <details id="textbox"><summary>Send text instead</summary><label class="sr" for="text">Text to send</label><textarea id="text" rows="5" aria-describedby="err" placeholder="Type or paste text: a link, a note, a config"></textarea><button id="sendtext" class="secondary">Send this text</button></details>
   <p class="fine">The codes flicker quickly. Avoid looking at the screen if you are sensitive to flashing light.</p>
   <details><summary>How it works</summary><ol><li>Open the receiver on the phone: scan the code shown when the stream starts, or go to <code id="rx"></code>.</li><li>The receiver starts its camera by itself (tap Start Camera if asked). Hold the phone so the whole code is in the frame.</li><li>Missed codes do not matter: every code is new (fountain code), and any set slightly larger than the file rebuilds it.</li><li>The phone checks SHA-256, then shows the file with Open, Save, Share and Email.</li></ol></details>
 </main>
@@ -18,15 +18,15 @@
   <div id="stage"><canvas id="qr" role="img" aria-label="Animated QR codes carrying the file"></canvas></div>
   <div id="bar">
     <figure id="join" role="button" tabindex="0" aria-label="Show the code that opens the receiver, large, for 5 seconds"><canvas id="ecode" role="img" aria-label="QR code that opens the receiver"></canvas><figcaption>Scan to open the receiver. Click to enlarge.</figcaption></figure>
-    <div class="info"><b id="fname"></b><span id="fstat"></span><small id="fdet"></small><small id="fok" hidden>Enough has been shown for a phone that saw everything. Keep playing until the phone says Transfer successful.</small></div>
+    <div class="info"><b id="fname"></b><span id="fstat"></span><small id="fdet"></small><small id="fchk"></small><small id="fok">Enough has been shown for a phone that saw everything. Keep playing until the phone says Transfer successful.</small></div>
     <div class="ctl">
-      <details id="opts"><summary>Settings</summary>
+      <details id="opts"><summary>Settings</summary><div class="optrow">
       <label>Density <select id="lvl"><option value="auto">Smart (auto)</option><option value="0">Extreme+ (v40, 30/s)</option><option value="1">Extreme (v40, 20/s)</option><option value="2">Turbo (v40, 15/s)</option><option value="3">Max (v40, 12/s)</option><option value="4">High (v33, 12/s)</option><option value="5">Medium (v25, 10/s)</option><option value="6">Low (v15, 8/s)</option></select></label>
-      <label>Codes <select id="k"><option value="auto">Auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option><option value="8">8</option></select></label></details>
+      <label>Codes <select id="k"><option value="auto">Auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option><option value="8">8</option></select></label></div></details>
       <div class="btns"><button id="pause" title="Space">Pause</button><button id="fs" title="F">Full screen</button><button id="close" class="primary" title="Esc">Stop</button></div>
     </div>
   </div>
   <p id="ssay" class="sr" role="status"></p>
 </div>
-<script src="../core/qrtx.js?v=2.3.0"></script><script src="send.js?v=2.3.0"></script>
+<script src="../core/qrtx.js?v=2.3.1"></script><script src="send.js?v=2.3.1"></script>
 </body></html>

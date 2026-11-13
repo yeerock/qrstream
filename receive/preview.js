@@ -27,22 +27,24 @@ const Preview = (() => {
     }
     return out;
   }
-  const xml = s => new DOMParser().parseFromString(s, 'application/xml');
+  // Office parts never carry a DTD; one that does could expand entities into gigabytes of text, so it is refused (the file still saves, only the preview falls back to a card)
+  const xml = s => { if (/<!DOCTYPE/i.test(s)) throw new Error('DTD'); return new DOMParser().parseFromString(s, 'application/xml'); };
+  const cut = t => { t = String(t); return t.length > 2000 ? t.slice(0, 2000) + '\u2026' : t; };   // a preview shows the start of each paragraph or cell, never megabytes
   const tags = (n, t) => [...n.getElementsByTagName(t)];
   async function docx(z, box) {
     const ps = tags(xml(await z['word/document.xml']()), 'w:p').slice(0, 60).map(p => tags(p, 'w:t').map(t => t.textContent).join('')).filter(Boolean);
-    box.innerHTML = `<div class="pdoc">${ps.map(t => `<p>${esc(t)}</p>`).join('')}</div>`;
+    box.innerHTML = `<div class="pdoc">${ps.map(t => `<p>${esc(cut(t))}</p>`).join('')}</div>`;
   }
   async function xlsx(z, box) {
     const ss = z['xl/sharedStrings.xml'] ? tags(xml(await z['xl/sharedStrings.xml']()), 'si').map(s => tags(s, 't').map(t => t.textContent).join('')) : [];
     const key = Object.keys(z).filter(k => /^xl\/worksheets\/sheet\d+\.xml$/.test(k)).sort()[0];
     const rows = tags(xml(await z[key]()), 'row').slice(0, 30).map(r => tags(r, 'c').slice(0, 12).map(c => { const v = tags(c, 'v')[0], t = tags(c, 't')[0]; return c.getAttribute('t') === 's' && v ? ss[+v.textContent] ?? '' : (v || t) ? (v || t).textContent : ''; }));
-    box.innerHTML = `<div class="pdoc"><table>${rows.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</table></div>`;
+    box.innerHTML = `<div class="pdoc"><table>${rows.map(r => `<tr>${r.map(x => `<td>${esc(cut(x))}</td>`).join('')}</tr>`).join('')}</table></div>`;
   }
   async function pptx(z, box) {
     const key = Object.keys(z).filter(k => /^ppt\/slides\/slide\d+\.xml$/.test(k)).sort((a, b) => parseInt(a.match(/\d+/)[0]) - parseInt(b.match(/\d+/)[0]))[0];
     const ps = tags(xml(await z[key]()), 'a:p').map(p => tags(p, 'a:t').map(t => t.textContent).join('')).filter(Boolean);
-    box.innerHTML = `<div class="pdoc"><h3>${esc(ps[0] || '')}</h3>${ps.slice(1).map(t => `<p>${esc(t)}</p>`).join('')}</div>`;
+    box.innerHTML = `<div class="pdoc"><h3>${esc(cut(ps[0] || ''))}</h3>${ps.slice(1, 60).map(t => `<p>${esc(cut(t))}</p>`).join('')}</div>`;
   }
   async function render(box, blob, name, url) {
     const t = blob.type, ext = name.toLowerCase().split('.').pop();

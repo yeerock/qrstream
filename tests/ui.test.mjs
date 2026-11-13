@@ -20,9 +20,9 @@ try {
     await p.click('#sendtext'); assert.match(await txt(p, 'err'), /Type or paste/);
     await p.eval("document.getElementById('text').value = 'hello from the test '.repeat(40)"); await p.click('#sendtext');
     await p.waitFor("!document.getElementById('play').hidden"); assert.equal(await txt(p, 'fname'), 'note.txt');
-    assert.equal(await p.eval('document.activeElement.id'), 'pause');
+    assert.equal(await p.eval('document.activeElement.id'), 'pause'); await p.waitFor("/^Showing/.test(document.getElementById('fstat').textContent)"); await w(1500);   // the first 2.5 s show the entry code and its own status text
     await p.waitFor("!document.getElementById('fok').hidden", 30000);   // a tiny file has been shown in full within a second of the stream starting
-    assert.match(await txt(p, 'fstat'), /^Showing for \d+:\d\d · pass \d+ · a phone needs about \d+ s/); assert.match(await txt(p, 'fdet'), /up to \d+ KB\/s · check code [0-9a-f]{4} [0-9a-f]{4}$/);
+    assert.match(await txt(p, 'fstat'), /^Showing for \d+:\d\d( · shown \d+ times over)? · a phone needs about \d+ s/); assert.match(await txt(p, 'fdet'), /up to \d+ (KB|bytes)\/s$/); assert.match(await txt(p, 'fchk'), /^Check code( [0-9a-f]{4}){4}$/);
     clean(p); await p.close();
   });
   await t('sender: Pause and Resume labels, and the label is Pause again after Stop and a new file', async () => {

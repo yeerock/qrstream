@@ -1,6 +1,6 @@
 {
   "name": "qrstream",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Send any file from a screen to a phone as a video of QR codes. One way, no network, own QR reader and erasure code, zero dependencies.",
   "license": "MIT",
   "private": true,
@@ -9,6 +9,7 @@
     "test": "node tests/codec.test.mjs && node tests/reader.test.mjs && node tests/decoder.test.mjs && node tests/repair.test.mjs",
     "e2e": "node tests/e2e.mjs",
     "ui": "node tests/ui.test.mjs",
+    "e2e:wide": "FILE=docs/demo-poster.png CAM=1920x1080 FRAMES=90 node tests/e2e.mjs",
     "serve": "node tests/serve.mjs",
     "demo-video": "node demo/make-demo.mjs"
   }

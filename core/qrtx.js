@@ -205,9 +205,11 @@
   /** Sender: one transfer. frame(n) gives the text of the code that starts at seed n. */
   class Stream {
     constructor(bytes, id) { this.b = bytes; this.len = bytes.length; this.K = blockCount(this.len); this.id = id >>> 0; this.seed = 0; }
-    next(v) {
+    /** v = QR version; tier (1 fast, 2 safer, 3 safe, 0 unstated) goes into header byte 3, which the frame CRC covers and older receivers ignore:
+        the receiver's coach then knows which kind of frame it is reading, whatever the layout. */
+    next(v, tier = 0) {
       const n = symbolsIn(v), out = new Uint8Array(HEADER + n * SYMBOL), dv = new DataView(out.buffer), seed = this.seed;
-      out[0] = MAGIC0; out[1] = MAGIC1; out[2] = VER; dv.setUint32(4, this.id); dv.setUint32(8, this.len); dv.setUint32(12, seed);
+      out[0] = MAGIC0; out[1] = MAGIC1; out[2] = VER; out[3] = tier & 3; dv.setUint32(4, this.id); dv.setUint32(8, this.len); dv.setUint32(12, seed);
       for (let i = 0; i < n; i++) {
         const at = HEADER + i * SYMBOL;
         for (const b of blocksOf(seed + i, this.K)) { const s = b * SYMBOL, e = Math.min(this.len, s + SYMBOL); for (let j = s; j < e; j++) out[at + j - s] ^= this.b[j]; }
@@ -225,7 +227,7 @@
     if (!b || b.length < HEADER + SYMBOL || b[0] !== MAGIC0 || b[1] !== MAGIC1 || b[2] !== VER || (b.length - HEADER) % SYMBOL) return null;
     const dv = new DataView(b.buffer, b.byteOffset);
     if (dv.getUint32(16) !== crc32(b)) return null;
-    return { id: dv.getUint32(4), len: dv.getUint32(8), seed: dv.getUint32(12), n: (b.length - HEADER) / SYMBOL, bytes: b };
+    return { id: dv.getUint32(4), len: dv.getUint32(8), seed: dv.getUint32(12), n: (b.length - HEADER) / SYMBOL, tier: b[3] & 3, bytes: b };
   }
 
   /** Receiver. add() takes one parsed frame; done when every block is known.

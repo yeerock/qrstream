@@ -26,3 +26,7 @@ summary{min-height:44px;display:list-item;padding:10px 0}details{padding:2px 0}f
 #heroplay{margin:10px auto 0;min-height:44px;color:#0b1118;border-color:#5b6b7c;background:#fff;cursor:pointer;font:600 15px system-ui,sans-serif}
 [hidden]{display:none!important}
 .by{font-weight:500;font-size:12px;color:var(--mut);letter-spacing:.04em;margin-left:2px;align-self:flex-end;padding-bottom:2px}
+:root{color-scheme:dark}
+nav{flex-wrap:nowrap;gap:4px}.brand{flex-wrap:wrap;line-height:1.1;min-height:44px}nav a{padding:0 8px}
+@media (max-width:400px){.brand .by{flex-basis:100%;margin-left:36px;padding:0}}
+#demo .small a{display:inline-block;padding:12px 2px}

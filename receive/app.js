@@ -7,9 +7,12 @@
   // a page that frames this one from another site could trick taps onto Open or Delete: refuse to show there
   try { if (top !== self && top.location.origin !== location.origin) throw 0; } catch (e) { document.documentElement.hidden = true; return; }
   const $ = i => document.getElementById(i), show = id => ['home', 'scan'].forEach(s => { $(s).hidden = s !== id; });
-  const sz = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  const sz = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1000 ? Math.round(n / 1024) + ' KB' : Math.max(0, Math.round(n)) + ' bytes';
   const info = t => { $('homenote').textContent = t; }, err = t => { $('homemsg').textContent = t; };
   const v = $('v'); let epoch = 0, other = null, saidQ = 0; let stream = null, col = null, running = false, wake = null, lastRead = 0, startedAt = 0, reads = 0, pool = [], idle = [], current = null;
+  const VQ = (() => { try { return new URL(document.currentScript.src).search; } catch (e) { return ''; } })();   // ?v=... of this script, passed on to the reader worker
+  const KEPT = 'The file is kept below, in this browser only.';
+  let parked = null;   // the transfer that was interrupted by another stream: taken up again when its frames return
   let from = [0, 0], again = { id: -1, n: 0 };   // where the time estimate counts from (time, progress): the start, or the last repair; full re-reads of one stream
   const MAX_LEN = 16 * 1048576;
   // only types a browser shows without running code; HTML, SVG, XML and scripts open as plain text or save as bytes, never in this origin
@@ -27,7 +30,7 @@
     all.reverse().forEach(f => {
       const li = document.createElement('li'), t = document.createElement('span'), s = document.createElement('small'), o = document.createElement('button'), d = document.createElement('button');
       t.textContent = f.title || f.name; s.textContent = `${sz(f.blob.size)}, ${new Date(f.at).toLocaleString()}`; t.appendChild(s);
-      o.textContent = 'Open'; o.setAttribute('aria-label', 'Open ' + f.name); o.onclick = () => finished(f); d.textContent = 'Delete'; d.setAttribute('aria-label', 'Delete ' + f.name); d.onclick = async () => { await tx('readwrite', x => x.delete(f.id)); history(); };
+      o.textContent = 'Open'; o.setAttribute('aria-label', 'Open ' + f.name); o.onclick = () => finished(f); d.textContent = 'Delete'; d.setAttribute('aria-label', 'Delete ' + f.name); d.onclick = async () => { await tx('readwrite', x => x.delete(f.id)); if ($('homenote').textContent === KEPT) info(''); await history(); (ul.querySelector('button') || $('start')).focus(); };
       li.append(t, o, d); ul.appendChild(li);
     });
   }
@@ -37,7 +40,7 @@
   const DEBUG = new URLSearchParams(location.search).has('debug');
   function makePool() {
     if (pool.length) return;
-    for (let i = 0; i < N; i++) { const w = new Worker('worker.js'); w.onmessage = e => { idle.push(w); if (e.data.error) say('Reader: ' + e.data.error.slice(0, 80)); e.data.texts.forEach(took); pump(); }; w.onerror = () => err('The reader could not start on this browser.'); pool.push(w); idle.push(w); }
+    for (let i = 0; i < N; i++) { const w = new Worker('worker.js' + VQ); w.onmessage = e => { idle.push(w); if (e.data.error) say('Reader: ' + e.data.error.slice(0, 80)); e.data.texts.forEach(took); pump(); }; w.onerror = () => err('The reader could not start on this browser.'); pool.push(w); idle.push(w); }
   }
   const MAX_SIDE = 1920,   // enough for 3 codes of version 40 at about 3.4 px per module; larger pictures only cost time
      gc = document.createElement('canvas'), gx = gc.getContext('2d', { willReadFrequently: true }); let note = '', noteUntil = 0;
@@ -61,14 +64,18 @@
     if (!running) return;   // verifying or finished: late reads from the workers must not start a second completion
     if (/^https?:\/\/\S+\/receive\/(\?go)?$/i.test(text)) { if (!col) { $('stat').textContent = 'Sender found. The file is starting.'; lastRead = Date.now(); } return; }   // the sender's entry code (a link to this page)
     const f = QRTX.parseFrame(text); if (!f || f.len < 3 || f.len > MAX_LEN) return;   // a forged header must not make this page allocate gigabytes
-    lastRead = Date.now(); reads++; seenN.push([lastRead, f.n]); if (f.n > topN) topN = f.n;
+    lastRead = Date.now(); reads++; seenN.push([lastRead, f.tier]); if (f.tier) tiers = true;
     if (col && (col.id !== f.id || col.len !== f.len)) {
       // another stream in view: a stray screen must not wipe what was read. Switch only when 3 different frames of the new stream arrive,
       // over at least 0.4 s, with no frame of the current stream in between (the same frame read again by another worker does not count).
       if (!other || other.id !== f.id || other.len !== f.len) other = { id: f.id, len: f.len, n: 1, last: f.seed, t0: Date.now() }; else if (f.seed !== other.last) { other.n++; other.last = f.seed; }
       if (other.n < 3 || Date.now() - other.t0 < 400) return;
-      if (col.progress > 0.05) say('A different file started on the screen. Starting again.', 4000);
-      col = null;
+      // the interrupted transfer is parked, not thrown away: when its screen comes back it goes on from where it was (one parked transfer at most)
+      const back = parked && parked.id === f.id && parked.len === f.len ? parked : null;
+      if (col.progress > 0.05) { parked = col; say(back ? 'Back to the earlier file. Going on from where it was.' : 'A different file started on the screen. The earlier one is kept in case its screen comes back.', 5000); }
+      else if (back) parked = null;
+      col = back; if (back) { if (parked === back) parked = null; startedAt = Date.now() - 1; from = [Date.now(), back.progress]; shown = 0; saidQ = Math.floor(back.progress * 4); }
+      seenN = []; tiers = false;
     }
     other = null;
     if (!col) { col = new QRTX.Collector(f.id, f.len); startedAt = Date.now(); from = [startedAt, 0]; reads = 1; shown = 0; saidQ = 0; $('say').textContent = ''; }
@@ -78,7 +85,7 @@
     draw();
     if (col.done && running) complete();
   }
-  let shown = 0, rate = 0, seenN = [], topN = 0;
+  let shown = 0, rate = 0, seenN = [], tiers = false;   // seenN: [time, tier] of the frames read in the last 3 s; tiers: this sender marks its frames
   const SCREENS = 'Another screen may be in view. Point the camera at one screen only.';
   /** Part of the file was forgotten (share of it; tries = times for the same part): say so, let the bar go back by that share, and estimate the time left from here. */
   function reread(share, tries) {
@@ -110,14 +117,14 @@
     const gap = (Date.now() - (lastRead || startedAt)) / 1000;
     // coach: the stream mixes fast dense codes with safer ones; which of them this camera reads says what to change
     const now = Date.now(); seenN = seenN.filter(x => now - x[0] < 3000);
-    const dense = seenN.filter(x => x[1] >= topN && topN > 0).length, any = seenN.length;
+    const fast = seenN.filter(x => x[1] === 1).length, any = seenN.length;   // tier 1 = the sender's fast layout (header byte 3); senders that do not mark frames get no tier advice
     let tip = '';
     if (gap > 6 && lastRead) tip = 'Lost the code. Point the camera at the screen and hold still.';
     else if (gap > 3 && !lastRead) tip = 'Fit the whole screen in the box. Turn down glare: tilt the phone a little.';
-    else if (any >= 3 && (dense === 0 || topN < 8)) tip = 'Only the slower codes are getting through. Move a little closer so the codes fill the box, and hold steady.';
-    else if (any >= 3 && dense / any < 0.4) tip = 'Good. Hold steadier to read the fast codes too.';
+    else if (tiers && any >= 3 && fast === 0) tip = 'Only the slower codes are getting through. Move a little closer so the codes fill the box, and hold steady.';
+    else if (tiers && any >= 3 && fast / any < 0.4) tip = 'Good. Hold steadier to read the fast codes too.';
     if (Date.now() > noteUntil) note = '';
-    $('hint').textContent = note || tip;
+    const h = note || tip; if ($('hint').textContent !== h) $('hint').textContent = h;   // unchanged text is not written again, or screen readers repeat it every second
   }, 1000);
   const AUTO = /\.(jpe?g|png|gif|webp|avif|bmp|mp4|webm|mov|mp3|m4a|ogg|wav|pdf|txt|csv|log|json)$/i;   // only these save by themselves; anything else waits for a tap
   async function complete() {
@@ -126,9 +133,11 @@
     const bad = () => {
       if (my !== epoch) return;   // stopped meanwhile: Stop wins
       let r = null; try { r = col && col.repair(); } catch (e) { }
+      if (r && r.tries >= 6) { stopCamera(); home('What was read is kept.'); err(`Part of this file was damaged ${r.tries} times. ${SCREENS} Then start the camera again.`); return; }
       if (r) reread(r.share, r.tries);
       else {
         if (col && again.id === col.id) again.n++; else again = { id: col ? col.id : -1, n: 1 };
+        if (again.n >= 5) { stopCamera(); col = null; home(''); err(`This file failed its check ${again.n} times. ${SCREENS} Then start again.`); return; }   // never read for ever
         col = null; shown = 0; say(again.n >= 3 ? `That file did not check out again. ${SCREENS}` : 'That file did not check out (SHA-256). Reading it again.', again.n >= 3 ? 8000 : 6000);
       }
       $('pct').textContent = ''; $('fill').style.width = '0%'; $('stat').textContent = 'Keep still'; draw(); resume();
@@ -151,7 +160,7 @@
       if (DEBUG) window.__qrs = { pct: 100, done: true, name: f.name, size: f.blob.size, type: f.blob.type, sha256: hex };
     } catch (e) { return bad(); }
     // the file is proven: from here nothing reads again. Whatever fails below, the camera is off and a screen is shown (the file, or the first screen with the file in the list).
-    stopCamera(); col = null; again = { id: -1, n: 0 }; const mine = epoch;
+    stopCamera(); col = null; parked = null; again = { id: -1, n: 0 }; const mine = epoch;
     try { if (navigator.vibrate) navigator.vibrate(120); } catch (e) { }
     beep(); await remember(f);
     if (mine !== epoch) { history(); return; }   // Stop or a new reading while the file was being stored: it is in the list
@@ -170,8 +179,9 @@
   function view(result) { $('v').hidden = result; document.querySelector('.guide').hidden = result; $('prev').hidden = !result; $('live').hidden = result; $('result').hidden = !result; show('scan'); }
   function finished(f, fresh) {
     if (url) URL.revokeObjectURL(url); url = URL.createObjectURL(f.blob);
-    $('dname').textContent = `${f.title ? f.title + ', ' : ''}${f.name}, ${sz(f.blob.size)}${f.secs ? `, received in ${f.secs.toFixed(1)} s (${sz(f.blob.size / f.secs)}/s)` : ''}`;
-    $('dhash').hidden = !f.sha; if (f.sha) $('dhash').textContent = `Check code ${f.sha.slice(0, 4)} ${f.sha.slice(4, 8)} (first 8 of SHA-256). It matches the code on the sender screen when this is the same file.`;
+    $('dname').textContent = `${f.title ? f.title + ', ' : ''}${f.name}, ${sz(f.blob.size)}${!fresh ? `, received ${new Date(f.at).toLocaleString()}` : f.secs >= 1 ? `, received in ${f.secs.toFixed(1)} s (${sz(f.blob.size / f.secs)}/s)` : f.secs ? ', received in under a second' : ''}`;
+    $('dtitle').lastChild.textContent = fresh ? 'Transfer successful' : 'Saved file';
+    $('dhash').hidden = !f.sha; if (f.sha) $('dhash').textContent = `Check code ${f.sha.slice(0, 16).match(/.{4}/g).join(' ')} (start of the SHA-256). The sender screen shows the same code for the same file: compare them to rule out a mix-up. Tap for the full SHA-256.`; $('dhash').onclick = () => { $('dhash').textContent = 'SHA-256 ' + f.sha; };
     document.title = 'Received: ' + f.name;
     view(true); Preview.render($('prev'), f.blob, f.name, url);
     // A web page cannot write to the photo library by itself (Web Share API, Level 2 files). iOS offers it in the share sheet (Save Image, Save Video, Save to Files); on Android a saved file appears in Gallery or Files under Downloads.
@@ -226,14 +236,14 @@
     v.play().then(loop).catch(() => { home(''); err('This video could not be played.'); });
   }
   // back to the first screen; partly read data is kept until the user discards it
-  function home(msg) { show('home'); err(''); document.title = 'QRStream Receiver'; const part = col && !col.done && col.progress > 0, pc = part ? Math.floor(col.progress * 100) : 0; info(msg || (part ? (pc ? `${pc} % of the last file is kept. Start Camera to continue.` : 'The start of the last file is kept. Start Camera to continue.') : '')); $('discard').hidden = !part; history(); }
+  function home(msg) { show('home'); err(''); document.title = 'QRStream Receiver'; const part = col && !col.done && col.progress > 0, pc = part ? Math.floor(col.progress * 100) : 0; info(msg || (part ? (pc ? `${pc} % of the last file is kept. Start Camera to continue.` : 'The start of the last file is kept. Start Camera to continue.') : '')); $('discard').hidden = !part; history(); if (document.activeElement === document.body || $('scan').contains(document.activeElement)) $('start').focus({ preventScroll: true }); }
   document.addEventListener('visibilitychange', () => { if (document.hidden && stream) { stopCamera(); home(col ? 'Paused. Start the camera again: what was read is kept.' : ''); } });
   $('start').onclick = () => startCamera();
   $('pick').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) fromFile(f); };
   $('stop').onclick = () => { stopCamera(); home(''); };
-  $('discard').onclick = () => { col = null; home(''); };
-  $('again').onclick = () => home('The file is kept below, in this browser only.');
-  $('clear').onclick = async () => { if (!confirm('Delete all received files from this browser?')) return; try { await tx('readwrite', x => x.clear()); } catch (e) { } history(); };
+  $('discard').onclick = () => { col = null; parked = null; home(''); };
+  $('again').onclick = () => home(KEPT);
+  $('clear').onclick = async () => { if (!confirm('Delete all received files from this browser?')) return; try { await tx('readwrite', x => x.clear()); } catch (e) { } if ($('homenote').textContent === KEPT) info(''); history(); $('start').focus(); };
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
   history();
   // opened from the sender's entry code: go straight to the camera (a browser that wants a tap keeps the Start Camera button)

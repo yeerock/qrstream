@@ -72,7 +72,7 @@
     const found = [], step = Math.max(1, Math.floor(H / 400));
     const add = (x, y, ms) => {
       for (const f of found) if (Math.abs(f.x - x) <= f.ms * 2 && Math.abs(f.y - y) <= f.ms * 2 && Math.abs(f.ms - ms) < f.ms * 0.5) { const n = f.n + 1; f.x = (f.x * f.n + x) / n; f.y = (f.y * f.n + y) / n; f.ms = (f.ms * f.n + ms) / n; f.n = n; return; }
-      found.push({ x, y, ms, n: 1 });
+      if (found.length < 4000) found.push({ x, y, ms, n: 1 });   // a hostile picture full of finder shapes must not make this list (searched for every hit) grow without end
     };
     const check = (c, x, y) => {
       const t = c[0] + c[1] + c[2] + c[3] + c[4], cx0 = x - c[4] - c[3] - c[2] / 2, maxRun = Math.ceil(t / 7 * 2.5);

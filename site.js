@@ -14,9 +14,9 @@
   };
   const rate = `${Math.round(per * FPS / 1024)} KB/s`;
   draw(); let f = 0, timer = 0;
-  const stop = () => { clearInterval(timer); timer = 0; cap.textContent = `Stopped. Four codes a screen carry ${rate} here; a full-size screen carries more.`; if (btn) { btn.hidden = false; btn.textContent = 'Play the stream'; } };
-  const play = () => { if (timer) return; f = 0; if (btn) btn.hidden = true; timer = setInterval(() => { if (document.hidden) return; if (++f > RUN * FPS) return stop(); draw(); cap.textContent = `Live stream · 4 codes a screen · ${rate} · every code is new`; }, 1000 / FPS); };
-  if (btn) btn.onclick = play;
+  const stop = () => { clearInterval(timer); timer = 0; cap.textContent = `Stopped. Four codes a screen carry ${rate} here; a full-size screen carries more.`; if (btn) btn.textContent = 'Play the stream'; };
+  const play = () => { if (timer) return; f = 0; if (btn) btn.textContent = 'Pause the stream'; timer = setInterval(() => { if (document.hidden) return; if (++f > RUN * FPS) return stop(); draw(); cap.textContent = `Live stream · 4 codes a screen · ${rate} · every code is new`; }, 1000 / FPS); };
+  if (btn) { btn.hidden = false; btn.onclick = () => (timer ? stop() : play()); }   // always there: motion that starts by itself needs a way to pause it
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { cap.textContent = `One screen of a stream: four codes, ${rate} when playing`; if (btn) { btn.hidden = false; btn.textContent = 'Play the stream'; } return; }
   play();
 })();

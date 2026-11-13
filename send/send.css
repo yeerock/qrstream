@@ -25,3 +25,13 @@ details{margin-top:20px;color:var(--mut)}summary{cursor:pointer;color:var(--fg)}
 #play.enough #bar{box-shadow:inset 0 3px 0 var(--ok)}
 @media (max-width:600px){#bar{flex-wrap:wrap;gap:8px;padding-top:8px}#ecode{width:72px;height:72px}#join figcaption{display:none}.ctl{flex:1 1 100%}#opts{display:block;width:100%}#opts summary{display:list-item;min-height:36px;padding:6px 4px;color:var(--mut);font-size:14px}.btns{width:100%}.btns button{flex:1;padding:0 8px}.info small{white-space:normal}}
 .by{font-size:12px;letter-spacing:.04em;opacity:.8}
+/* 2.3.1: a bar whose height does not depend on its text (so the stage and the code size stay put), two rows on mid-size screens, one row of settings */
+:root{color-scheme:dark}
+.info span,.info small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.info small{white-space:nowrap}
+#fchk{font-variant-numeric:tabular-nums;color:var(--fg)}#fok{visibility:hidden;white-space:normal;height:2.5em;line-height:1.25}#play.enough #fok{visibility:visible}
+.optrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}#opts[open]{display:block}
+#opts summary{min-height:44px;padding:10px 4px}
+@media (max-width:1100px){#bar{flex-wrap:wrap;gap:8px}.info{flex:1 1 60%}.ctl{flex:1 1 100%;justify-content:space-between}}
+@media (max-width:600px){.info small{white-space:nowrap}#fok{white-space:normal;height:3.75em}.optrow label{flex:1}.optrow select{flex:1;min-width:0}}
+option:disabled{color:#7b8794}
+@media (max-width:600px){#fok{display:none}}

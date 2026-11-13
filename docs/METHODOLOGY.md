@@ -14,8 +14,8 @@ A screen and a camera form a **one-way, lossy, unordered channel**. The camera s
 
 ```
 file ──gzip?──► pack(meta + bytes) ──► 142-byte source blocks ──► erasure code symbols
-     ──► frame = header(20 B) + n symbols ──► CRC-32 ──► Base45 text ──► QR (v15..v40, level L)
-     ──► 1–8 codes per screen ──► screen at 8–15 codes/s
+     ──► frame = header(20 B) + n symbols ──► CRC-32 ──► Base45 text ──► QR (v10..v40, level L)
+     ──► 1–8 codes per screen ──► screen at 8–30 screens/s
                       ⋮  light  ⋮
 camera ──► canvas pixels ──► Web Worker pool (own QR reader) ──► text ──► Base45 ──► CRC-32 check
      ──► erasure decoder ──► gunzip ──► SHA-256 check ──► preview / Open / Save / Share (OS share sheet)
@@ -83,10 +83,10 @@ Symbols needed beyond the file, in simulation with frame loss (`node tests/codec
 | 15 | 77 × 77 | 3 | 426 |
 
 * **Several codes per screen.** The reader decodes up to 9 codes in one camera picture (8 stream codes and the entry code), so a wide screen shows two rows of four smaller codes, a square one a 2 by 2 grid, and a small one a single code. Many smaller codes fill a wide screen better than a few large ones: version 40 is 177 modules high and cannot use the rest of the height. In the end-to-end test (10 screens a second on the simulated camera) a 400 KB file took 8.0 s with two v40 codes and 7.0 s with eight v22 codes; an earlier run of a 300 KB file needed 140 screens with 1 code, 75 with 2 and 53 with 3.
-* **Rate.** 8 to 15 codes per second per slot. At 15/s each code is still on screen for about 2 camera frames at 30 fps, which avoids frames torn between two codes.
-* **No back channel, so Auto cycles.** The sender steps through five levels every 15 s. Symbols are 142 bytes at every level, so a change never invalidates what the receiver holds.
+* **Rate.** Smart mode shows 15, 12 and 10 screens a second on its three tiers (about 13 on average); the manual levels go from 8 to 30. At 15/s each screen is still shown for about 2 camera frames at 30 fps, which avoids frames torn between two screens.
+* **No back channel, so the stream adapts by itself.** Smart mode weaves three tiers into one stream, A A A B A A B C (fast, safer, safe), and marks each frame with its tier in header byte 3 so the receiver's coach knows which kind it reads. Symbols are 142 bytes on every tier, so nothing the receiver holds is ever invalidated.
 * **Sharp pixels.** Every module is a whole number of device pixels (`image-rendering: pixelated`) with a 4-module quiet zone.
-* Raw peak: 3 codes × 2,840 B × 15/s ≈ **128 KB/s (about 1 Mbit/s)**.
+* Raw peak: 3 codes × 2,840 B × 30/s ≈ **250 KB/s** at the manual Extreme+ level (measured through the simulated camera: 150 KB in 0.8 s); Smart mode on a 2560 × 1440 screen carries about 131 KB/s.
 
 ## 5. The QR reader (written for this stream)
 
@@ -108,7 +108,7 @@ Tests (`tests/reader.test.mjs`) draw our own encoder's codes through a projectiv
 * The stream plays **A A A B A A B C** with 15, 12 and 10 codes per second. With a fountain code every frame adds information, so throughput follows the best tier the camera can read, with no probing and no waiting.
 * The receiver records which frame sizes it decodes. It says nothing while all is well, and asks the user to move closer, hold steadier or reduce glare only when the fast tier is not getting through.
 * Entry: the link code fills the stage for 2.5 s and then stays in a corner of the sender bar, so it costs the stream no time. The phone's camera app opens the receiver, which starts its camera by itself. Common picture, video, audio, PDF and text types save by themselves on Android and computers; other types wait for a tap.
-* Layouts: Smart mode tries every QR version from 10 to 40 in one or two rows of 1 to 4 codes (up to 8 codes a screen) and keeps what carries most: on a Full HD screen two rows of four v22 codes carry 81 KB/s where two v40 codes carried 71. A layout must give modules of at least 3 device pixels and 2 CSS pixels and fit 560 by 315 modules, which is what a 1920 by 1080 camera picture resolves at about 3.4 pixels per module.
+* Layouts: Smart mode tries every QR version from 10 to 40 in one or two rows of 1 to 4 codes (up to 8 codes a screen) and keeps what carries most: on a Full HD screen two rows of four v23 codes carry about 87 KB/s where two v40 codes carry about 66 (bytes of one round of the weave over its time). A layout must give modules of at least 3 device pixels and 2 CSS pixels and fit 560 by 315 modules, which is what a 1920 by 1080 camera picture resolves at about 3.4 pixels per module.
 
 ## 7. Receiver engineering
 

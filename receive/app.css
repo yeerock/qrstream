@@ -53,3 +53,10 @@ li button{min-height:44px;padding:0 12px;border-radius:8px;border:1px solid var(
 .acts{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 @media (orientation:landscape){.guide{width:min(86%,150vh);aspect-ratio:16/9}}
 .by{font-size:12px;letter-spacing:.04em;opacity:.8}
+/* 2.3.1 */
+:root{color-scheme:dark}
+label.secondary:focus-within{outline:3px solid #8fb8ff;outline-offset:2px}#cam,#zoom{min-height:44px}.link{cursor:pointer}
+#box{container-type:size}@media (orientation:landscape){.guide{width:min(86cqw,calc(86cqh*16/9));aspect-ratio:16/9}}
+#prev img{width:auto;height:auto;background:none}
+.how{margin:8px 0 0;color:var(--mut)}.how summary{cursor:pointer;color:var(--fg);min-height:44px;padding:10px 4px}.how a{color:#8fb8ff}.how ol{padding-left:20px;margin:4px 0 12px}
+#dhash{cursor:pointer;overflow-wrap:anywhere}

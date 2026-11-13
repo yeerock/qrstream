@@ -2,10 +2,10 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<script src="guard.js?v=2.3.0"></script>
+<script src="guard.js?v=2.3.1"></script>
 <title>QRStream: send a file from a screen to a phone with QR codes, no network</title><meta name="description" content="Send any file from a screen to a phone as a video of QR codes. One way, no network, no pairing, no upload. Fountain coded and SHA-256 checked. Open source.">
 <meta name="theme-color" content="#0f1720"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<meta property="og:type" content="website"><meta property="og:title" content="QRStream: send a file from a screen to a phone with QR codes"><meta property="og:description" content="One way, no network, no pairing, no upload. Own QR reader and erasure code, zero dependencies, MIT."><meta property="og:url" content="https://yeerock.github.io/qrstream/"><meta property="og:image" content="https://yeerock.github.io/qrstream/docs/demo-poster.png"><meta name="twitter:card" content="summary_large_image"><link rel="stylesheet" href="site.css?v=2.3.0"></head>
+<meta property="og:type" content="website"><meta property="og:title" content="QRStream: send a file from a screen to a phone with QR codes"><meta property="og:description" content="One way, no network, no pairing, no upload. Own QR reader and erasure code, zero dependencies, MIT."><meta property="og:url" content="https://yeerock.github.io/qrstream/"><meta property="og:image" content="https://yeerock.github.io/qrstream/docs/demo-poster.png"><meta name="twitter:card" content="summary_large_image"><link rel="stylesheet" href="site.css?v=2.3.1"></head>
 <body>
 <header class="top"><a class="brand" href="./"><img src="icon.svg" alt="" width="28" height="28">QRStream<span class="by">by VYROX</span></a><nav><a class="go" href="send/">Send</a><a class="go" href="receive/">Receive</a><a href="#how">How</a><a href="#use">Use cases</a><a href="#when">When</a><a href="#demo">Demo</a><a href="https://github.com/yeerock/qrstream">GitHub</a></nav></header>
 
@@ -17,7 +17,7 @@
     <div class="cta"><a class="btn primary" href="send/">Send a file</a><a class="btn" href="receive/">Receive on this phone</a></div>
     <p class="small">Try it now: open <b>Send</b> on a computer and <b>Receive</b> on a phone, tap <i>Use a demo picture</i>, point the camera.</p>
   </div>
-  <figure class="live" aria-label="A live QR stream made by the same code the sender uses"><canvas id="hero" width="80" height="80"></canvas><figcaption id="herocap" aria-hidden="true">Live stream · 4 codes a screen · every code is new</figcaption><button id="heroplay" class="btn" hidden>Play the stream</button></figure>
+  <figure class="live" aria-label="A live QR stream made by the same code the sender uses"><canvas id="hero" width="80" height="80"></canvas><figcaption id="herocap" aria-hidden="true">Live stream · 4 codes a screen · every code is new</figcaption><button id="heroplay" class="btn">Pause the stream</button></figure>
 </section>
 
 <section id="what" class="band"><h2>What it is</h2>
@@ -42,7 +42,7 @@
     <div class="card"><h3>Isolated and secure systems</h3><p>Take a report or log off a machine that must never join a network, without USB sticks that carry malware the other way.</p></div>
     <div class="card"><h3>Kiosks, HMIs and embedded screens</h3><p>Industrial panels, CCTV/NVR monitors, medical carts and point-of-sale screens that have a display but no friendly way to export.</p></div>
     <div class="card"><h3>Field work with no signal</h3><p>Mines, ships, plants, basements and remote sites: the receiver works offline after one visit (it installs as a web app).</p></div>
-    <div class="card"><h3>Evidence and incident capture</h3><p>Hand a camera still, a short clip or a PDF to an inspector's phone on the spot, with a SHA-256 check and a short check code on both screens to compare.</p></div>
+    <div class="card"><h3>Evidence and incident capture</h3><p>Hand a camera still, a short clip or a PDF to an inspector's phone on the spot, with a SHA-256 check and a 16-character check code on both screens to compare.</p></div>
     <div class="card"><h3>Guests and BYOD</h3><p>Give a visitor a file without giving them your Wi-Fi password, an app, or an email address.</p></div>
     <div class="card"><h3>Demos, classrooms, events</h3><p>Put a handout, a config or a ticket on a projector; everyone in the room films it at once. One sender, any number of receivers.</p></div>
   </div>
@@ -51,24 +51,24 @@
 <section id="when"><h2>When to use it, and when not</h2>
   <div class="grid2">
     <div class="card good"><h3>Good fit</h3><ul><li>Files up to a few MB: pictures, short clips, PDFs, Office files, logs, configs, keys.</li><li>There is a screen, a camera, and no shared network, or a network you must not use.</li><li>You want zero setup on the sender beyond a web page.</li><li>Many receivers at once.</li></ul></div>
-    <div class="card bad"><h3>Use something else</h3><ul><li>Large files (tens of MB and up): even at the peak of about 128 KB/s a 10 MB file needs well over a minute, and longer on a small screen.</li><li>You need the phone to send back to the screen: this link is one way by design.</li><li>The screen is very small or the camera very poor: use a lower density, or a cable.</li><li>Secret data on a screen others can film: anyone with a camera in view can receive it too.</li></ul></div>
+    <div class="card bad"><h3>Use something else</h3><ul><li>Large files (tens of MB and up): even at about 130 KB/s on a large screen a 10 MB file needs well over a minute, and longer on a small screen.</li><li>You need the phone to send back to the screen: this link is one way by design.</li><li>The screen is very small or the camera very poor: use a lower density, or a cable.</li><li>Secret data on a screen others can film: anyone with a camera in view can receive it too.</li></ul></div>
   </div>
 </section>
 
 <section id="demo" class="band"><h2>Demo</h2>
   <p>The clip below is a real run made by the test suite: the sender's stream is filmed by a simulated camera (tilt, blur, noise, uneven light), Chrome uses that as its camera, and the real receiver rebuilds the file and checks its SHA-256. Nothing is faked.</p>
-  <video id="demovid" controls playsinline preload="metadata" poster="docs/demo-poster.png" src="docs/demo.webm"></video>
+  <video id="demovid" aria-label="Demo: a file sent from the sender screen to the receiver through a simulated camera" controls playsinline preload="metadata" poster="docs/demo-poster.png" src="docs/demo.webm"></video>
   <p class="small">Live demo: <a href="send/?demo">sender with a demo picture</a> · <a href="receive/">receiver</a>.</p>
 </section>
 
 <section id="spec"><h2>Specifications</h2>
   <table class="spec"><tbody>
-    <tr><th>Code</th><td>QR Model 2 (ISO/IEC 18004), alphanumeric mode, error level L, versions 15 to 40; own encoder</td></tr>
+    <tr><th>Code</th><td>QR Model 2 (ISO/IEC 18004), alphanumeric mode, error level L, versions 10 to 40; own encoder</td></tr>
     <tr><th>Payload text</th><td>Base45 (RFC 9285): 2 bytes in 3 QR alphanumeric characters</td></tr>
     <tr><th>Erasure code</th><td>Systematic random linear fountain over GF(2) in generations of 1,024 blocks, interleaved source order, incremental Gaussian elimination with bounded memory; 142-byte symbols fixed across densities. Measured overhead 1 to 4 % at 20 to 50 % frame loss</td></tr>
     <tr><th>Frame</th><td>20-byte header (magic, version, stream id, length, seed, CRC-32) + up to 20 symbols = 2,840 bytes per code at QR v40; 1 to 8 codes per screen, in one or two rows</td></tr>
     <tr><th>Smart mode</th><td>The sender measures its own screen, picks the densest layouts that stay readable, and weaves fast and safe frames into one stream (A A A B A A B C). The phone coaches the user only when needed. No settings.</td></tr>
-    <tr><th>Throughput</th><td>Raw per code: v40 at 15/s ≈ 42 KB/s. Up to 8 codes per screen (two rows of four) and up to 30 screens per second (manual Extreme). Smart mode on a Full HD screen: up to 81 KB/s; on a 2560 × 1440 screen: up to 137 KB/s. Measured through the camera path with a camera simulator (not yet on physical phones): 300 KB random in 4.5 s with Smart on a 1080p screen (65 KB/s); 128 to 137 KB/s at 3 codes and 30 screens/s; a 334 KB log in 0.9 s thanks to gzip</td></tr>
+    <tr><th>Throughput</th><td>Raw per code: v40 at 15/s ≈ 42 KB/s. Up to 8 codes per screen (two rows of four) and up to 30 screens per second (manual Extreme). Smart mode on a Full HD screen: up to 87 KB/s; on a 2560 × 1440 screen: up to 131 KB/s. Measured through the camera path with a camera simulator (not yet on physical phones): 300 KB random in 4.5 s with Smart on a 1080p screen (65 KB/s); 128 to 137 KB/s at 3 codes and 30 screens/s; a 334 KB log in 0.9 s thanks to gzip</td></tr>
     <tr><th>Integrity</th><td>CRC-32 per frame, CRC-32 per chunk to locate damage, SHA-256 of the file</td></tr>
     <tr><th>Reader</th><td>Own QR reader in Web Workers: local-threshold binarisation, finder search, timing-pattern sizing, incremental alignment-grid lock with least-squares homography, per-cell maps, Reed-Solomon (Berlekamp-Massey, Forney). About 25 ms for three v40 codes in a 1080p picture</td></tr>
     <tr><th>Limits</th><td>Sender 10 MB; receiver refuses streams over 16 MB, stops inflating at 64 MB, and bounds decoder memory</td></tr>
@@ -80,9 +80,9 @@
   <ul class="checks">
     <li>No server: both pages are static files. The receiver makes no network request with your data (strict Content-Security-Policy, <code>connect-src 'self'</code>).</li>
     <li>Received files are typed defensively: HTML, SVG, XML and scripts are opened as plain text, never run in the page.</li>
-    <li>Forged frames are rejected (magic, CRC-32), a forged length over 16 MB is ignored, and previews stop inflating at 4 MB.</li>
+    <li>Misread frames are rejected (magic, CRC-32). Frames forged by another screen are not: the SHA-256 and the check code are what catch a wrong file. Also, a forged length over 16 MB is ignored, and previews stop inflating at 4 MB.</li>
     <li>Zero third-party code: the QR encoder and reader, the erasure code and the previews are all written in this project. Nothing is loaded from a CDN.</li>
-    <li>The SHA-256 proves the file arrived without errors; it does not prove who showed it. Compare the 8-character check code on both screens when that matters. Files save by themselves only for common picture, video, audio, PDF and text types; anything else waits for a tap.</li>
+    <li>The SHA-256 proves the file arrived without errors; it does not prove who showed it. Both screens show a 16-character check code (the start of the SHA-256) to rule out a mix-up; tap it on the receiver for the full value when it matters. Files save by themselves only for common picture, video, audio, PDF and text types; anything else waits for a tap.</li>
     <li>Optical links are visible: treat the screen like a printout. Anyone filming it can read it.</li>
   </ul>
 </section>
@@ -98,5 +98,5 @@
 </section>
 
 <footer><p>QRStream by <a href="https://vyrox.com/" rel="noopener">VYROX</a> · MIT licence · <a href="https://github.com/yeerock/qrstream/blob/main/docs/METHODOLOGY.md">Methodology</a> · <a href="https://github.com/yeerock/qrstream">Source</a></p></footer>
-<script src="core/qrtx.js?v=2.3.0"></script><script src="site.js?v=2.3.0"></script>
+<script src="core/qrtx.js?v=2.3.1"></script><script src="site.js?v=2.3.1"></script>
 </body></html>

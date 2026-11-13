@@ -8,10 +8,10 @@ One way · no network · no pairing · no app · no upload · <b>zero dependenci
 <a href="https://yeerock.github.io/qrstream/send/">Sender</a> ·
 <a href="https://yeerock.github.io/qrstream/receive/">Receiver</a> ·
 <a href="docs/METHODOLOGY.md">Methodology</a> ·
-<a href="docs/demo.webm">Demo video</a>
+<a href="https://yeerock.github.io/qrstream/#demo">Demo video</a>
 </p>
 
-[![QRStream demo](docs/demo-poster.png)](docs/demo.webm)
+[![QRStream demo](docs/demo-poster.png)](https://yeerock.github.io/qrstream/#demo)
 
 *The demo video is a real test run: the sender's stream is filmed by a simulated camera (tilt, blur, noise, uneven light), Chrome uses it as its webcam, and the real receiver rebuilds the file and matches its SHA-256. Nothing is mocked.*
 
@@ -116,15 +116,15 @@ Examples measured by the sender itself:
 
 | Screen | Smart chooses |
 |---|---|
-| 2560 × 1440 monitor | 4 × 2 grid of QR v28 (8 codes), up to 137 KB/s |
-| 1920 × 1080 monitor | 4 × 2 grid of QR v22 (8 codes), safer layouts woven in, up to 81 KB/s |
-| 1440 × 900 window, 2 device pixels per CSS pixel | 4 × 2 grid of QR v28, up to 134 KB/s |
-| 1440 × 900 window, 1 device pixel per CSS pixel | 2 × QR v38, up to 57 KB/s |
-| 1080 × 1080 square screen | 2 × 2 grid of QR v22, up to 41 KB/s |
-| 390 × 844 phone, 3 device pixels per CSS pixel | 2 stacked QR v24, up to 23 KB/s |
+| 2560 × 1440 monitor | 4 × 2 grid of QR v28 (8 codes), up to 131 KB/s |
+| 1920 × 1080 monitor | 4 × 2 grid of QR v23 (8 codes), safer layouts woven in, up to 87 KB/s |
+| 1440 × 900 window, 2 device pixels per CSS pixel | 4 × 2 grid of QR v28, up to 128 KB/s |
+| 1440 × 900 window, 1 device pixel per CSS pixel | 2 × QR v38, up to 53 KB/s |
+| 1080 × 1080 square screen | 2 × 2 grid of QR v21, up to 37 KB/s |
+| 390 × 844 phone, 3 device pixels per CSS pixel | 2 stacked QR v21, up to 19 KB/s |
 | 390 × 844 window at 1 device pixel per CSS pixel | 1 × QR v15 |
 
-The rates are the sender's own figure for a camera that reads every code.
+The rates are the sender's own figure for a camera that reads every code: the bytes of one round of the weave over the time that round takes (about 13 screens a second).
 
 Manual levels remain for lab use:
 
@@ -168,7 +168,7 @@ The receiver previews pictures, video, text, and the start of Word, Excel and Po
 
 | Item | Value |
 |---|---|
-| Symbol | QR Model 2 (ISO/IEC 18004), error level L, versions 15 to 40, own encoder |
+| Symbol | QR Model 2 (ISO/IEC 18004), error level L, versions 10 to 40 (manual levels use 15 to 40), own encoder |
 | Payload text | Base45 (RFC 9285) in QR alphanumeric mode: 2 bytes in 3 characters |
 | Erasure code | Systematic random linear fountain over GF(2), generations of 1,024 blocks, interleaved sources, incremental Gaussian elimination with bounded memory |
 | Symbol size | 142 bytes, the same at every QR version, so density changes lose nothing |
@@ -260,9 +260,9 @@ A packed transfer is `[u16 JSON length][JSON {name, mime, sha256, size, z?, titl
 | A hostile file runs script when opened | MIME allowlist: HTML, SVG, XML and JavaScript open as `text/plain`, unknown types as bytes. Tested end to end with a hostile HTML file. |
 | Data leaves the device | No server. Strict CSP: `default-src 'self'`, `connect-src 'self'`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`, no referrer. |
 | Hostile streams that never complete | The decoder holds at most one row per block and does one reduction per symbol: 60,000 crafted symbols on a forged 16 MB stream cost 18 MB and 0.1 ms each in the test. |
-| Forged or corrupted frames | Magic, version and CRC-32 checks. A length under 3 bytes or over 16 MB is ignored. Malformed metadata is rejected. |
-| Another stream in view | The receiver switches streams only after 3 different frames of the new one, over at least 0.4 s, with none of the current stream in between, so a stray screen cannot wipe a transfer. |
-| Wrong file shown by a hostile screen | SHA-256 proves error-free delivery, not origin. Both screens show an 8-character check code to compare. |
+| Misread or corrupted frames | Magic, version and CRC-32 checks (a CRC stops misreads, not a forger: see the rows on another screen and on a wrong file). A length under 3 bytes or over 16 MB is ignored. Malformed metadata is rejected. |
+| Another stream in view | The receiver switches streams only after 3 different frames of the new one, over at least 0.4 s, with none of the current stream in between. The interrupted transfer is parked, not dropped, and goes on when its screen comes back. A file that fails its check 5 times stops the camera with a clear message. |
+| Wrong file shown by a hostile screen | SHA-256 proves error-free delivery, not origin. Both screens show a 16-character check code (the start of the SHA-256; the receiver shows the full value on a tap). It rules out a mix-up; for anything that matters compare the full SHA-256. |
 | Unwanted downloads | Only common picture, video, audio, PDF and text types save by themselves; other types wait for a tap. |
 | Misleading names | Control and direction-override characters are removed from the title and name. |
 | Framing (clickjacking) | The first script on every page hides it when another site frames it. |
@@ -312,6 +312,7 @@ No packages to install: Node 22+ and Google Chrome.
 ```bash
 npm test             # codec, reader (32 picture cases), decoder (edge sizes, late join, hostile stream), repair (damaged symbols)
 npm run ui           # the pages in a real browser: sender controls, text sending, reduced motion, framing, a second stream in view
+npm run e2e:wide     # the same on a Full HD sender, where Smart mode shows 8 codes a screen
 npm run e2e          # sender -> simulated camera (.y4m fake webcam) -> receiver; SHA-256 must match
 FILE=tests/fixtures/hostile.html EXPECT_TYPE=text/plain npm run e2e   # a hostile HTML file arrives inert
 FILE=some.bin K=3 LVL=0 FPS=30 npm run e2e                            # 3 codes, Extreme+, 30 screens/s
@@ -345,11 +346,13 @@ demo/               builds docs/demo.webm from a real end-to-end run
 * **The phone looked away.** Point it back; what was read is kept. *Stop* keeps it too, until *Discard*.
 * **Dark room or a dim panel?** Phones that allow it show a *Light* button for the torch.
 * **Keyboard on the sender:** Space pauses, F is full screen, Esc stops.
+* **The phone says "move closer".** Every frame carries a mark for its tier (fast, safer, safe), so the receiver knows which kind it is reading; the hint shows only when none of the fast frames get through.
 * **Flashing:** the codes flicker quickly. People who set *reduce motion* get a *Start stream* button instead of an automatic start.
 
 ## Limits and roadmap
 
 * Not yet measured with physical cameras across phone models. The numbers above come from the camera simulator, which models tilt, blur, noise and light but not rolling shutter or screen flicker. Field results will be added.
+* Generations are 1,024 blocks plus a remainder; a small last generation gets few repair symbols and can make the last blocks of some file sizes slow to arrive. Equal-size generations fix this but change the block mapping, so they need a new format version.
 * Colour codes (three channels) could triple density again, with a decoder robust to camera white balance.
 * An optional optical back channel could make Smart mode closed-loop.
 
