@@ -64,7 +64,7 @@
   <table class="spec"><tbody>
     <tr><th>Code</th><td>QR Model 2 (ISO/IEC 18004), alphanumeric mode, error level L, versions 15 to 40; own encoder</td></tr>
     <tr><th>Payload text</th><td>Base45 (RFC 9285): 2 bytes in 3 QR alphanumeric characters</td></tr>
-    <tr><th>Erasure code</th><td>Systematic random linear fountain over GF(2) in generations of 1,024 blocks, interleaved source order, Gauss-Jordan decoding; 142-byte symbols fixed across densities. Measured overhead 1 to 4 % at 20 to 50 % frame loss</td></tr>
+    <tr><th>Erasure code</th><td>Systematic random linear fountain over GF(2) in generations of 1,024 blocks, interleaved source order, incremental Gaussian elimination with bounded memory; 142-byte symbols fixed across densities. Measured overhead 1 to 4 % at 20 to 50 % frame loss</td></tr>
     <tr><th>Frame</th><td>20-byte header (magic, version, stream id, length, seed, CRC-32) + up to 20 symbols = 2,840 bytes per code at QR v40; 1 to 3 codes side by side per screen</td></tr>
     <tr><th>Smart mode</th><td>The sender measures its own screen, picks the densest layouts that stay readable, and weaves fast and safe frames into one stream (A A A B A A B C). The phone coaches the user only when needed. No settings.</td></tr>
     <tr><th>Throughput</th><td>Raw per code: v40 at 15/s ≈ 42 KB/s. Up to 3 codes per screen and up to 30 screens per second (manual Extreme). Measured through the camera path with a camera simulator (not yet on physical phones): 300 KB random in 4.5 s with Smart on a 1080p screen (65 KB/s); 128 to 137 KB/s at 3 codes and 30 screens/s; a 334 KB log in 0.9 s thanks to gzip</td></tr>

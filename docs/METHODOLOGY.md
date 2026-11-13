@@ -52,7 +52,7 @@ A packed transfer is `[u16 JSON length][JSON {name, mime, sha256, size, z?, titl
 * **Systematic:** seeds `0 … K-1` carry the source blocks themselves. With no loss, the file is done after one pass and costs nothing extra.
 * **Interleaved:** source seed `i` carries block `(i · p) mod K`, with `p` coprime to K and larger than a generation. One lost frame (20 consecutive seeds) then costs every generation a little, instead of one generation a lot.
 * **Repair symbols:** seed `s ≥ K` belongs to one generation of 1,024 blocks (chosen in proportion to the generation size) and is the XOR of a pseudo-random half of that generation's blocks. Row bits come from a non-linear hash (MurmurHash3 `fmix32`).
-* **Decoder:** peeling (solve any equation with one unknown) plus **Gauss-Jordan elimination over GF(2) per generation** once it has one more equation than unknowns. A random binary matrix with `g + 2` rows has full rank with probability about 75 %, and each further row halves the failure rate, so the overhead is a few symbols per generation.
+* **Decoder:** incremental Gaussian elimination over GF(2) per generation. Each arriving symbol is reduced against the pivot rows already held and either becomes the pivot row of one more block or is dropped as redundant, so a generation never holds more than one 272-byte row per block and no elimination is ever repeated. A generation is solved by one back-substitution when its pivots and known blocks cover it. A random binary matrix reaches full rank about 2 rows after it becomes square, so the overhead is a few symbols per generation whatever the frame loss.
 
 Background: random linear network coding (Ho et al., *IEEE Trans. Inf. Theory* 52(10), 2006, doi:10.1109/TIT.2006.881746); generation-based coding (Chou, Wu, Jain, *Allerton* 2003); fountain and LT codes (Luby, *FOCS* 2002, doi:10.1109/SFCS.2002.1181950); inactivation decoding in RaptorQ (RFC 6330).
 
@@ -122,7 +122,7 @@ Tests (`tests/reader.test.mjs`) draw our own encoder's codes through a projectiv
 |---|---|
 | Hostile file runs script when opened | MIME allowlist. HTML, SVG, XML and JavaScript become `text/plain`, unknown types become `application/octet-stream`. Tested with a hostile HTML file through the full pipeline. |
 | Data leaves the device | No server. CSP `default-src 'self'`, `connect-src 'self'`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`, and no referrer. |
-| Forged or corrupted frames | Magic, version and CRC-32 checks. A length under 3 bytes or over 16 MB is ignored. Decoder memory still grows with the repair symbols held (see Limits). |
+| Forged or corrupted frames | Magic, version and CRC-32 checks. A length under 3 bytes or over 16 MB is ignored. The decoder holds at most one row per block and does one reduction per symbol, so a stream that never completes cannot grow memory or stall the page (tests/decoder.test.mjs). |
 | Decompression bombs | gunzip is streamed and capped at 64 MB. Document previews count the inflated bytes and stop at 4 MB. |
 | Unsafe filenames | Names are reduced to `[A-Za-z0-9_.-]` with no leading dots, at most 120 characters. |
 | Supply chain | No third-party code at all, no CDN, no build step, no npm packages (not even for tests). |

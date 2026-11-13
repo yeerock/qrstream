@@ -191,7 +191,6 @@
     if (!out.length) out.push(first + r() % n);
     return out;
   }
-  const first = set => { for (const b of set) return b; };
   const blockCount = len => Math.ceil(len / SYMBOL);
 
   /** Most symbols per frame in version v. */
@@ -223,70 +222,93 @@
     return { id: dv.getUint32(4), len: dv.getUint32(8), seed: dv.getUint32(12), n: (b.length - HEADER) / SYMBOL, bytes: b };
   }
 
-  /** Receiver: peeling decoder. add() takes one parsed frame; done when every block is known. */
+  /** Receiver. add() takes one parsed frame; done when every block is known.
+      Each generation keeps its repair symbols as an echelon basis over GF(2): a new symbol is reduced against the rows already held, then either becomes the
+      pivot row of one more block or turns out to add nothing and is dropped. So a generation of n blocks never holds more than n rows (272 bytes each, in one array),
+      however many symbols arrive, and each symbol costs one reduction: there is no growing list of equations and no repeated elimination.
+      When pivots plus known blocks cover the generation, one back-substitution solves it. */
+  const MAX_STREAM = 64 * 1048576, DW = Math.ceil(SYMBOL / 4);
   class Collector {
-    constructor(id, len) { this.id = id; this.len = len; this.K = blockCount(len); this.out = new Uint8Array(this.K * SYMBOL); this.known = new Uint8Array(this.K); this.solved = 0; this.seen = new Set(); this.waiting = new Map(); this.frames = 0; this.pend = new Map(); this.unk = Array.from({ length: Math.ceil(this.K / GEN) }, (_, g) => genSpan(g, this.K)[1]); this.dirty = new Set(); this.tried = new Map(); }
+    constructor(id, len) {
+      if (!(len >= 1 && len <= MAX_STREAM)) throw new RangeError('stream length');
+      this.id = id; this.len = len; this.K = blockCount(len); this.out = new Uint8Array(this.K * SYMBOL); this.known = new Uint8Array(this.K); this.solved = 0; this.pivots = 0; this.frames = 0; this.symbols = 0;
+      this.td = new Uint32Array(DW); this.t8 = new Uint8Array(this.td.buffer, 0, SYMBOL); this.tb = new Uint32Array((GEN + 31) >>> 5);   // the working row
+      this.gens = new Array(Math.ceil(this.K / GEN)).fill(null); this.unk = this.gens.map((_, g) => genSpan(g, this.K)[1]);
+    }
     get done() { return this.solved === this.K; }
-    /** Share of the file already held, for the bar. Fountain symbols solve late, so symbols seen count too (about 5 % more than the file are needed). */
-    get progress() { return this.done ? 1 : Math.min(0.99, Math.max(this.solved / this.K, this.rank / this.K)); }
-    /** Blocks solved plus, per generation, the equations waiting for elimination (each adds one unknown's worth until full rank): what the bar shows. */
-    get rank() { let r = this.solved; for (const [g, e] of this.pend) r += Math.min(e.length, this.unk[g]); return r; }
+    /** Blocks solved plus pivot rows held (each is one more block once its generation completes): what the bar shows. */
+    get rank() { return this.solved + this.pivots; }
+    get progress() { return this.done ? 1 : Math.min(0.99, this.rank / this.K); }
+    /** Returns how much closer to complete this frame brought the file, in blocks. */
     add(f) {
       if (f.id !== this.id || f.len !== this.len) return 0;
-      this.frames++; let fresh = 0;
-      for (let i = 0; i < f.n; i++) {
-        const seed = f.seed + i; if (this.seen.has(seed)) continue;
-        this.seen.add(seed); fresh++;
-        this._symbol(seed, f.bytes.slice(HEADER + i * SYMBOL, HEADER + (i + 1) * SYMBOL));
-      }
-      for (const g of this.dirty) this._gauss(g); this.dirty.clear();
-      return fresh;
+      this.frames++; const before = this.rank;
+      this.symbols += f.n;
+      for (let i = 0; i < f.n; i++) this._symbol((f.seed + i) >>> 0, f.bytes, HEADER + i * SYMBOL);
+      return this.rank - before;
     }
     _xor(d, b) { const s = b * SYMBOL, o = this.out; for (let j = 0; j < SYMBOL; j++) d[j] ^= o[s + j]; }
-    _symbol(seed, data) {
-      const open = new Set();
-      for (const b of blocksOf(seed, this.K)) { if (this.known[b]) this._xor(data, b); else open.add(b); }
-      if (!open.size) return;
-      if (open.size === 1) { this._solve([...open][0], data); return; }
-      const eq = { open, data }, g = genOf(first(open));
-      for (const b of open) { let l = this.waiting.get(b); if (!l) this.waiting.set(b, l = []); l.push(eq); }
-      let l = this.pend.get(g); if (!l) { l = []; this.pend.set(g, l); } l.push(eq); this.dirty.add(g);
+    /** A generation's storage: one slot per block (its pivot row: bit set over the generation, then the symbol data), allocated once, on its first repair symbol. */
+    _gen(g) {
+      let G = this.gens[g]; if (G) return G;
+      const [f0, n] = genSpan(g, this.K), W = (n + 31) >>> 5;
+      return this.gens[g] = { g, f0, n, W, has: new Uint8Array(n), bits: new Uint32Array(n * W), d32: new Uint32Array(n * DW), np: 0 };
     }
-    _solve(first, data) {
-      const todo = [[first, data]];
-      while (todo.length) {
-        const [b, d] = todo.pop(); if (this.known[b]) continue;
-        this.out.set(d, b * SYMBOL); this.known[b] = 1; this.solved++; this.unk[genOf(b)]--;
-        const l = this.waiting.get(b); if (!l) continue;
-        this.waiting.delete(b);
-        for (const eq of l) {
-          if (!eq.open.has(b)) continue;
-          this._xor(eq.data, b); eq.open.delete(b);
-          if (eq.open.size === 1) { todo.push([[...eq.open][0], eq.data]); }
+    _symbol(seed, src, at) {
+      const bl = blocksOf(seed, this.K), g = genOf(bl[0]);
+      if (!this.unk[g]) return;   // this generation is complete
+      if (bl.length === 1) { if (!this.known[bl[0]]) this._solve(bl[0], src.subarray(at, at + SYMBOL)); return; }
+      const G = this._gen(g), bits = this.tb.fill(0), d8 = this.t8; this.td.fill(0); d8.set(src.subarray(at, at + SYMBOL));
+      for (const b of bl) { if (this.known[b]) this._xor(d8, b); else { const c = b - G.f0; bits[c >>> 5] |= 1 << (c & 31); } }
+      this._insert(G);
+    }
+    /** Reduce the working row (this.tb bits, this.td data) against the basis; store it as a new pivot or drop it when nothing is left. */
+    _insert(G) {
+      const bits = this.tb, d = this.td, W = G.W, GB = G.bits, GD = G.d32;
+      for (let w = 0; w < W; w++) while (bits[w]) {
+        const low = bits[w] & -bits[w], c = (w << 5) + 31 - Math.clz32(low), b = G.f0 + c;
+        if (this.known[b]) { this._xor(this.t8, b); bits[w] ^= low; continue; }   // a block solved since this bit was set
+        const pb = c * W, pd = c * DW;
+        if (!G.has[c]) {
+          for (let k = 0; k < W; k++) GB[pb + k] = bits[k]; for (let k = 0; k < DW; k++) GD[pd + k] = d[k];
+          G.has[c] = 1; G.np++; this.pivots++;
+          if (G.np === this.unk[G.g]) { this._finish(G); return; }
+          let one = (bits[w] ^ low) === 0; for (let k = w + 1; one && k < W; k++) if (bits[k]) one = false;
+          if (one) this._solve(b, this.t8);   // the row names a single block: that block is known now
+          return;
+        }
+        for (let k = w; k < W; k++) bits[k] ^= GB[pb + k];
+        for (let k = 0; k < DW; k++) d[k] ^= GD[pd + k];
+      }
+    }
+    /** One block becomes known (a source symbol, or a row that came down to one block). */
+    _solve(b, data) {
+      if (this.known[b]) return;
+      const g = genOf(b), G = this.gens[g];
+      this.out.set(data.subarray(0, SYMBOL), b * SYMBOL); this.known[b] = 1; this.solved++; this.unk[g]--;
+      if (!this.unk[g]) { if (G) { this.pivots -= G.np; this.gens[g] = null; } return; }
+      if (!G) return;
+      const c = b - G.f0;
+      if (G.has[c]) {   // its pivot row now speaks about the other blocks only: take it out and reduce it again
+        G.has[c] = 0; G.np--; this.pivots--;
+        this.tb.fill(0); for (let k = 0; k < G.W; k++) this.tb[k] = G.bits[c * G.W + k]; for (let k = 0; k < DW; k++) this.td[k] = G.d32[c * DW + k];
+        this._insert(G);
+      }
+      if (this.gens[g] === G && G.np === this.unk[g]) this._finish(G);
+    }
+    /** Full rank: back-substitute from the last pivot to the first (a later pivot row is by then the plain block, so it is XORed in whole words), then free the generation. */
+    _finish(G) {
+      const d8 = new Uint8Array(G.d32.buffer), D = G.d32, W = G.W;
+      for (let c = G.n - 1; c >= 0; c--) {
+        if (!G.has[c]) continue;
+        const pd = c * DW, pb = c * W; G.bits[pb + (c >>> 5)] ^= 1 << (c & 31);
+        for (let w = c >>> 5; w < W; w++) {
+          let x = G.bits[pb + w];
+          while (x) { const low = x & -x, j = (w << 5) + 31 - Math.clz32(low); x ^= low; if (G.has[j]) { const q = j * DW; for (let k = 0; k < DW; k++) D[pd + k] ^= D[q + k]; } else this._xor(d8.subarray(pd * 4, pd * 4 + SYMBOL), G.f0 + j); }
         }
       }
-    }
-    /** Gauss-Jordan elimination over GF(2) in one generation: rows are the waiting equations (bit sets over its unsolved blocks).
-        Runs when the generation holds at least as many equations as unknowns; full rank solves the whole generation at once. */
-    _gauss(g) {
-      const eqs = (this.pend.get(g) || []).filter(e => e.open.size > 1); this.pend.set(g, eqs);
-      const [f0, n] = genSpan(g, this.K); let u = 0; const col = new Int32Array(n).fill(-1), blk = [];
-      for (let i = 0; i < n; i++) if (!this.known[f0 + i]) { col[i] = u++; blk.push(f0 + i); }
-      if (!u) { this.pend.delete(g); return; }
-      if (eqs.length < u + 1 || eqs.length <= (this.tried.get(g) || 0)) return;   // one spare row: most attempts then succeed; never retry with no new row
-      this.tried.set(g, eqs.length);
-      const W = (u + 31) >>> 5, rows = eqs.map(e => { const bits = new Uint32Array(W); for (const b of e.open) { const c = col[b - f0]; bits[c >>> 5] |= 1 << (c & 31); } return { bits, data: e.data.slice() }; });
-      const piv = new Int32Array(u); let rank = 0;
-      for (let c = 0; c < u; c++) {
-        const w = c >>> 5, m = 1 << (c & 31); let r = rank;
-        while (r < rows.length && !(rows[r].bits[w] & m)) r++;
-        if (r === rows.length) return;   // short of rank: wait for more symbols of this generation
-        const p = rows[r]; rows[r] = rows[rank]; rows[rank] = p;
-        for (let i = 0; i < rows.length; i++) if (i !== rank && rows[i].bits[w] & m) { const a = rows[i].bits, d = rows[i].data; for (let k = w; k < W; k++) a[k] ^= p.bits[k]; for (let k = 0; k < SYMBOL; k++) d[k] ^= p.data[k]; }
-        piv[c] = rank++;
-      }
-      for (let c = 0; c < u; c++) this._solve(blk[c], rows[piv[c]].data);
-      this.pend.delete(g);
+      for (let c = 0; c < G.n; c++) if (G.has[c]) { const b = G.f0 + c; this.out.set(d8.subarray(c * DW * 4, c * DW * 4 + SYMBOL), b * SYMBOL); this.known[b] = 1; this.solved++; this.unk[G.g]--; }
+      this.pivots -= G.np; this.gens[G.g] = null;
     }
     bytes() { return this.out.subarray(0, this.len); }
   }

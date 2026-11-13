@@ -77,7 +77,7 @@ flowchart LR
 3. **Frame.** Up to 20 symbols go into one frame with a 20-byte header and a CRC-32, written as Base45 text, the densest text a QR code holds reliably.
 4. **Show.** Each frame becomes a QR code (own encoder, ISO/IEC 18004). Smart mode places 1 to 4 codes in a row or a grid and plays 10 to 15 screens a second.
 5. **Film.** The phone films the screen. A pool of Web Workers runs our own QR reader on each camera picture, about 25 ms for three codes in a 1080p frame.
-6. **Rebuild.** Frames that fail the CRC are dropped. The decoder solves for the blocks as symbols arrive, by peeling plus Gauss-Jordan elimination per generation.
+6. **Rebuild.** Frames that fail the CRC are dropped. The decoder solves for the blocks as symbols arrive, by incremental Gaussian elimination per generation: each symbol is reduced against the rows already held as it arrives.
 7. **Prove.** The file is unzipped and its SHA-256 must match. Then it appears in the camera box, ready to use.
 
 ```mermaid
@@ -167,7 +167,7 @@ The receiver previews pictures, video, text, and the start of Word, Excel and Po
 |---|---|
 | Symbol | QR Model 2 (ISO/IEC 18004), error level L, versions 15 to 40, own encoder |
 | Payload text | Base45 (RFC 9285) in QR alphanumeric mode: 2 bytes in 3 characters |
-| Erasure code | Systematic random linear fountain over GF(2), generations of 1,024 blocks, interleaved sources, Gauss-Jordan decoding |
+| Erasure code | Systematic random linear fountain over GF(2), generations of 1,024 blocks, interleaved sources, incremental Gaussian elimination with bounded memory |
 | Symbol size | 142 bytes, the same at every QR version, so density changes lose nothing |
 | Frame | 20-byte header + up to 20 symbols = 2,840 bytes per code at QR v40 |
 | Codes per screen | 1 to 4: a row of 1 to 3, 2 stacked, or a 2 × 2 grid; 4-module quiet zone |
@@ -211,7 +211,7 @@ Engine figures:
 * **Systematic:** symbols `0 … K-1` are the source blocks themselves. With no loss, one pass is enough.
 * **Interleaved:** source symbol *i* carries block *(i · p) mod K*, with *p* coprime to *K*. A lost frame then costs every generation a little, instead of one generation a lot.
 * **Repair symbols:** each belongs to one generation of 1,024 blocks, chosen in proportion to generation size, and is the XOR of a pseudo-random half of that generation. Row bits come from a non-linear hash (MurmurHash3 `fmix32`); a GF(2)-linear generator such as xorshift cannot reach full rank.
-* **Decoding:** peeling, plus Gauss-Jordan elimination over GF(2) per generation once it holds one more equation than unknowns.
+* **Decoding:** incremental Gaussian elimination over GF(2) per generation. Each arriving symbol is reduced against the pivot rows already held; it becomes the pivot of one more block or is dropped as redundant. A generation therefore holds at most one 272-byte row per block, in one array, whatever arrives, and it is solved by one back-substitution the moment its rank is full. Measured in Node on a desktop: a 10 MB file at 20 % frame loss decodes in 0.8 s of CPU with the slowest frame at 4 ms; a phone that joins a 3 MB stream after every source symbol has passed needs 0.7 % extra symbols and 15 MB of memory (the earlier decoder needed about 600 MB there).
 * **Result:** 1.6 to 4 % extra symbols at 20 to 50 % frame loss. An earlier LT design with a robust soliton distribution needed 24 to 43 %.
 
 Background: random linear network coding (Ho et al., IEEE Trans. Inf. Theory 52(10), 2006, doi:10.1109/TIT.2006.881746); generation coding (Chou, Wu and Jain, Allerton 2003); LT codes (Luby, FOCS 2002, doi:10.1109/SFCS.2002.1181950); RaptorQ inactivation decoding (RFC 6330).
@@ -256,6 +256,7 @@ A packed transfer is `[u16 JSON length][JSON {name, mime, sha256, size, z?, titl
 |---|---|
 | A hostile file runs script when opened | MIME allowlist: HTML, SVG, XML and JavaScript open as `text/plain`, unknown types as bytes. Tested end to end with a hostile HTML file. |
 | Data leaves the device | No server. Strict CSP: `default-src 'self'`, `connect-src 'self'`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`, no referrer. |
+| Hostile streams that never complete | The decoder holds at most one row per block and does one reduction per symbol: 60,000 crafted symbols on a forged 16 MB stream cost 18 MB and 0.1 ms each in the test. |
 | Forged or corrupted frames | Magic, version and CRC-32 checks. A length under 3 bytes or over 16 MB is ignored. Malformed metadata is rejected. |
 | Another stream in view | The receiver switches streams only after 3 codes in a row from the new one, so a stray code cannot wipe a transfer. |
 | Wrong file shown by a hostile screen | SHA-256 proves error-free delivery, not origin. Both screens show an 8-character check code to compare. |
@@ -343,7 +344,6 @@ demo/               builds docs/demo.webm from a real end-to-end run
 
 ## Limits and roadmap
 
-* Decoder memory grows with the number of repair symbols held. A phone that joins a multi-megabyte stream late, after the source symbols have passed, can use a lot of memory; a more compact equation store is the next engine change.
 * Not yet measured with physical cameras across phone models. The numbers above come from the camera simulator, which models tilt, blur, noise and light but not rolling shutter or screen flicker. Field results will be added.
 * Colour codes (three channels) could triple density again, with a decoder robust to camera white balance.
 * An optional optical back channel could make Smart mode closed-loop.

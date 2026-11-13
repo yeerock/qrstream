@@ -32,7 +32,7 @@ for (const [size, loss] of [[3000, 0], [50000, 0.3], [300000, 0.5], [1048576, 0.
   }
   const u = Q.unpack(c.bytes());
   assert.equal(createHash('sha256').update(u.file).digest('hex'), meta.sha256);
-  const symbols = [...c.seen].length, K = Q.blockCount(data.length);
+  const symbols = c.symbols, K = Q.blockCount(data.length);
   console.log(`   ${sent} frames sent, overhead ${((symbols / K - 1) * 100).toFixed(1)}% over the file`);
 });
 console.log(`${pass} passed`);
