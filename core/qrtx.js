@@ -5,7 +5,11 @@
      Byte mode comes back through text decoding on some readers and loses bytes.
    - Erasure code: systematic random linear fountain over GF(2) in generations of 1024 blocks, Gauss-Jordan decoding (see blocksOf). The first K symbols are the file
      itself. A missed frame never has to come round again, and any set of symbols a few percent larger than the file rebuilds it.
-   - Frame = header + n symbols of SYMBOL bytes. The symbol size does not depend on the QR version, so changing the density on the screen keeps what the phone already holds. */
+   - Frame = header + n symbols of SYMBOL bytes. The symbol size does not depend on the QR version, so changing the density on the screen keeps what the phone already holds.
+   - Repair of damage: a wrong symbol that passes the frame CRC (a rare misread, or a forged frame from another screen) must not cost the whole transfer. The decoder checks
+     every symbol that adds nothing against what it holds (Collector, sus), the sender seals the metadata with CRC-32 values of consecutive chunks of the body (seal),
+     and after a failed check the receiver forgets only the blocks of the chunks that fail (damaged, Collector.repair). None of this is authentication: whoever sees the
+     screen can forge a stream that passes every check except being the right file; the SHA-256 and the check code on both screens stay the proof. */
 (function (root, factory) { const m = factory(); if (typeof module !== 'undefined' && module.exports) module.exports = m; else root.QRTX = m; })(typeof self !== 'undefined' ? self : this, () => {
   const SYMBOL = 142, HEADER = 20, MAGIC0 = 0xA5, MAGIC1 = 0x51, VER = 3, GEN = 1024;
   const ALNUM = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:', A_IDX = Object.fromEntries([...ALNUM].map((c, i) => [c, i]));
@@ -168,6 +172,8 @@
   // ---- CRC-32 (IEEE 802.3) of every frame: a code misread into another valid code never reaches the file
   const CRC = Int32Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c; });
   function crc32(b) { let c = -1; for (let i = 0; i < b.length; i++) if (i < 16 || i >= 20) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ -1) >>> 0; }   // bytes 16-19 hold the CRC itself
+  /** Plain CRC-32 of bytes from..to (to not included): the chunk checks of the body and the seal of the metadata. The frame CRC above is a different sum (it skips its own field). */
+  function crc32of(b, from = 0, to = b.length) { let c = -1; for (let i = from; i < to; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ -1) >>> 0; }
 
   // ---- Erasure code: systematic, generation-based random linear code over GF(2).
   // Seeds 0..K-1 are the file blocks themselves, in interleaved order. A repair seed belongs to one generation (GEN consecutive blocks; chosen in proportion to generation size) and is the XOR of a
@@ -226,12 +232,21 @@
       Each generation keeps its repair symbols as an echelon basis over GF(2): a new symbol is reduced against the rows already held, then either becomes the
       pivot row of one more block or turns out to add nothing and is dropped. So a generation of n blocks never holds more than n rows (272 bytes each, in one array),
       however many symbols arrive, and each symbol costs one reduction: there is no growing list of equations and no repeated elimination.
-      When pivots plus known blocks cover the generation, one back-substitution solves it. */
+      When pivots plus known blocks cover the generation, one back-substitution solves it.
+      Consistency: a symbol that adds nothing must agree with what is held (a repair symbol reduced to no blocks must have reduced to zero data; a source symbol of a known
+      block must equal that block). When it does not, one of the two is wrong and nothing here can say which: the new symbol is not used, and sus[g] counts the event.
+      One case is settled at once: a disputed block of a generation that has not used a repair symbol yet. Nothing depends on that block, so it alone is forgotten (neither
+      content is trusted) and one later repair symbol restores it. In every other case the generation is left as it is until the final check, where the sender's chunk checks
+      name the damaged blocks exactly (repair); forgetting the whole generation on the spot was measured and costs more, because of what a refill costs:
+      a generation receives one repair symbol in every G of the stream (G = number of generations), so u forgotten blocks need about (u + 2) x G more symbols. A whole
+      generation therefore takes about as long as the whole file took, whatever the file size; only a part of one is quick. forget() and forgetBlocks() cost no memory:
+      the blocks go back to unknown and the generation's rows are freed, so the bound of one row per block stays. */
   const MAX_STREAM = 64 * 1048576, DW = Math.ceil(SYMBOL / 4);
   class Collector {
     constructor(id, len) {
       if (!(len >= 1 && len <= MAX_STREAM)) throw new RangeError('stream length');
       this.id = id; this.len = len; this.K = blockCount(len); this.out = new Uint8Array(this.K * SYMBOL); this.known = new Uint8Array(this.K); this.solved = 0; this.pivots = 0; this.frames = 0; this.symbols = 0;
+      const ng = Math.ceil(this.K / GEN); this.sus = new Uint32Array(ng); this.redo = new Uint32Array(ng); this.mark = new Uint32Array(ng); this.flags = 0; this.lost = 0; this.metaTries = 0;   // inconsistencies seen, times forgotten (per generation); totals
       this.td = new Uint32Array(DW); this.t8 = new Uint8Array(this.td.buffer, 0, SYMBOL); this.tb = new Uint32Array((GEN + 31) >>> 5);   // the working row
       this.gens = new Array(Math.ceil(this.K / GEN)).fill(null); this.unk = this.gens.map((_, g) => genSpan(g, this.K)[1]);
     }
@@ -256,8 +271,12 @@
     }
     _symbol(seed, src, at) {
       const bl = blocksOf(seed, this.K), g = genOf(bl[0]);
+      if (bl.length === 1) {
+        const b = bl[0]; if (!this.known[b]) { this._solve(b, src.subarray(at, at + SYMBOL)); return; }
+        const o = this.out, s = b * SYMBOL; for (let j = 0; j < SYMBOL; j++) if (o[s + j] !== src[at + j]) { this._flag(g, b); break; }   // the same block with other content
+        return;
+      }
       if (!this.unk[g]) return;   // this generation is complete
-      if (bl.length === 1) { if (!this.known[bl[0]]) this._solve(bl[0], src.subarray(at, at + SYMBOL)); return; }
       const G = this._gen(g), bits = this.tb.fill(0), d8 = this.t8; this.td.fill(0); d8.set(src.subarray(at, at + SYMBOL));
       for (const b of bl) { if (this.known[b]) this._xor(d8, b); else { const c = b - G.f0; bits[c >>> 5] |= 1 << (c & 31); } }
       this._insert(G);
@@ -280,6 +299,36 @@
         for (let k = w; k < W; k++) bits[k] ^= GB[pb + k];
         for (let k = 0; k < DW; k++) d[k] ^= GD[pd + k];
       }
+      for (let k = 0; k < DW; k++) if (d[k]) { this._flag(G.g, -1); return; }   // nothing new, so the data must have cancelled too
+    }
+    /** An inconsistency in generation g (b = the disputed block of a source symbol, or -1). See the class comment for what is forgotten and why. */
+    _flag(g, b) { this.sus[g]++; this.flags++; if (b >= 0 && this.unk[g] && !this.gens[g]) this.forgetBlocks([[b, b]], this.frames); }   // one frame with 20 disputed symbols is one event, not 20
+    /** Blocks first..last of each [first, last] pair become unknown again and the stream refills them; every other block is kept. The rows of a touched generation
+        are dropped too (they were reduced with blocks that are now in doubt). Returns how far the rank fell; lost adds these up, redo[g] counts the times per generation. */
+    forgetBlocks(ranges, frame = 0) {
+      let n = 0; const seen = new Set();
+      for (const [a, e] of ranges) for (let b = Math.max(0, a), end = Math.min(e, this.K - 1); b <= end; b++) {
+        const g = genOf(b);
+        if (!seen.has(g)) { seen.add(g); if (!frame || this.mark[g] !== frame) { this.redo[g]++; if (frame) this.mark[g] = frame; } const G = this.gens[g]; if (G) { n += G.np; this.pivots -= G.np; this.gens[g] = null; } }
+        if (this.known[b]) { this.known[b] = 0; this.solved--; this.unk[g]++; n++; }
+      }
+      this.lost += n; return n;
+    }
+    /** Forget whole generations (a list of generation numbers). */
+    forget(gens) { return this.forgetBlocks([...gens].map(g => { const [f, n] = genSpan(g, this.K); return [f, f + n - 1]; })); }
+    /** Most times any one generation was forgotten: 3 or more means the damage keeps coming (another screen in view). */
+    get worst() { let m = 0; for (const x of this.redo) if (x > m) m = x; return m; }
+    /** The complete stream failed its final check (SHA-256, gunzip or unreadable metadata): forget the damaged part only, when the sender's chunk checks can name it.
+        Returns {blocks, share, meta, tries} (share = the part of the file to read again, tries = most times one of these generations was forgotten), or null
+        when everything has to be read again (an old sender without checks, checks that all pass, or metadata that stays unreadable).
+        Unreadable metadata takes the chunk checks with it, so nothing vouches for any other block: the blocks that can hold it are read again once (a few symbols;
+        enough when no other block was solved from the wrong one), and when that does not help, everything (a whole generation would take as long). */
+    repair() {
+      if (!this.done) return null;
+      const d = damaged(this.bytes()); if (!d || (d.meta && ++this.metaTries > 1)) return null;
+      const blocks = this.forgetBlocks(d.blocks); if (!blocks) return null;
+      let tries = 0; for (const [a, e] of d.blocks) for (let g = genOf(a); g <= genOf(Math.min(e, this.K - 1)); g++) if (this.redo[g] > tries) tries = this.redo[g];
+      return { blocks, share: blocks / this.K, meta: d.meta, tries };
     }
     /** One block becomes known (a source symbol, or a row that came down to one block). */
     _solve(b, data) {
@@ -313,10 +362,11 @@
     bytes() { return this.out.subarray(0, this.len); }
   }
 
-  // ---- what travels: [u16 length of the JSON][JSON name, mime, kind, sha256, title, at][file bytes]
-  function pack(meta, file) {
-    const j = new TextEncoder().encode(JSON.stringify(meta));
-    if (j.length > 2000) throw new Error('Name too long.');
+  // ---- what travels: [u16 length of the JSON][JSON name, mime, sha256, size, title, at, z; from seal() also cs, c, m][body: the file bytes, gzipped when z says so]
+  const META_MAX = 2000, SEAL_ROOM = 1800, META_BLOCKS = Math.ceil((2 + META_MAX) / SYMBOL);
+  function pack(meta, file) { return packJson(new TextEncoder().encode(JSON.stringify(meta)), file); }
+  function packJson(j, file) {
+    if (j.length > META_MAX) throw new Error('Name too long.');
     const out = new Uint8Array(2 + j.length + file.length);
     out[0] = j.length >> 8; out[1] = j.length & 255; out.set(j, 2); out.set(file, 2 + j.length);
     return out;
@@ -326,5 +376,62 @@
     if (n === 0 || 2 + n > b.length) return null;
     try { return { meta: JSON.parse(new TextDecoder().decode(b.subarray(2, 2 + n))), file: b.subarray(2 + n) }; } catch (e) { return null; }
   }
-  return { _int: { template, maskMap, bch, EXP, LOG, EC_L, BLOCKS_L, ALNUM, alignPos, countBits }, GEN, encode, capacity, symbolsIn, Stream, Collector, parseFrame, pack, unpack, b45enc, b45dec, blocksOf, blockCount, SYMBOL, HEADER };
+
+  // ---- chunk checks: what lets a receiver find damage instead of reading everything again.
+  // seal() is pack() plus three metadata fields that an older receiver ignores:
+  //   cs = chunk size in bytes, c = Base64 of the CRC-32 values (4 bytes each, big-endian) of consecutive cs-byte chunks of the body as sent (after gzip),
+  //   m  = CRC-32 (8 hex digits) of the JSON text itself with m as "00000000"; always the last field, so the receiver can tell damaged metadata from damaged content.
+  // Chunk size: the whole JSON stays within SEAL_ROOM = 1,800 of the 2,000 bytes pack() allows, so the list gets what the name and type leave (about 1,560 characters
+  // = 292 checks for a short name, 100 or more for the longest name the sender allows) and cs = body / that many, never under one block (142 bytes).
+  // A 10 MB body gets chunks of about 36 KB, 1 MB about 3.6 KB, and up to about 40 KB one check per block. The repair is as fine as the chunks: see Collector.
+  const b64 = b => { let s = ''; for (let i = 0; i < b.length; i += 3000) s += String.fromCharCode.apply(null, b.subarray(i, i + 3000)); return btoa(s); };
+  function chunkChecks(body, cs) {
+    const n = Math.ceil(body.length / cs), out = new Uint8Array(n * 4), dv = new DataView(out.buffer);
+    for (let i = 0; i < n; i++) dv.setUint32(i * 4, crc32of(body, i * cs, Math.min(body.length, (i + 1) * cs)));
+    return b64(out);
+  }
+  /** Chunk size for a body, given the bytes the other metadata fields take. 0 = no room for checks. */
+  function chunkSize(bodyLen, metaLen) {
+    const most = Math.floor(Math.floor((SEAL_ROOM - metaLen - 36) / 4) * 3 / 4);   // 36 = the field names, quotes and commas of cs, c and m, and the digits of cs and m
+    return most >= 1 && bodyLen > 0 ? Math.max(SYMBOL, Math.ceil(bodyLen / most)) : 0;
+  }
+  const hex8 = n => (n >>> 0).toString(16).padStart(8, '0');
+  function seal(meta, body) {
+    const enc = new TextEncoder(), m = { ...meta }; delete m.cs; delete m.c; delete m.m; const m0 = { ...m };
+    const cs = chunkSize(body.length, enc.encode(JSON.stringify(m)).length);
+    if (cs) { m.cs = cs; m.c = chunkChecks(body, cs); }
+    m.m = '00000000'; const j = enc.encode(JSON.stringify(m));
+    j.set(enc.encode(hex8(crc32of(j))), j.length - 10);   // the text ends with 00000000"}
+    if (j.length > META_MAX) return pack(m0, body);   // no room even for the metadata check: send it as before
+    return packJson(j, body);
+  }
+  /** Stream bytes a..e (e not included) lie in these blocks and generations: [first block, last block, first generation, last generation]. */
+  const span = (a, e) => { const f = Math.floor(a / SYMBOL), l = Math.floor((Math.max(a + 1, e) - 1) / SYMBOL); return [f, l, genOf(f), genOf(l)]; };
+  /** Body bytes a..e of a stream whose metadata JSON is jsonLen bytes long: the body starts after the 2 length bytes and the JSON, so a chunk can straddle two generations. */
+  const bodySpan = (jsonLen, a, e) => span(2 + jsonLen + a, 2 + jsonLen + e);
+  /** A decoded stream that failed its check: where is the damage?
+      {meta: true, blocks} = the metadata is unreadable or fails its own check: the blocks that can hold it (it is at most 2,002 bytes, 15 blocks).
+      {meta: false, blocks, chunks} = these chunks of the body fail; blocks = [first, last] pairs, merged, in order.
+      null = it cannot be told (a sender without checks, or every check passes): read everything again. */
+  function damaged(b) {
+    const K = blockCount(b.length), head = { meta: true, blocks: [[0, Math.min(K, META_BLOCKS) - 1]] }, n = b[0] * 256 + b[1], off = 2 + n;
+    if (n < 2 || n > META_MAX || off > b.length) return head;
+    const j = b.subarray(2, off), tail = new TextDecoder().decode(j.subarray(Math.max(0, n - 15))), mt = /^"m":"([0-9a-f]{8})"\}$/.exec(tail); let meta;
+    if (mt) { const z = j.slice(); z.fill(48, n - 10, n - 2); if (hex8(crc32of(z)) !== mt[1]) return head; }
+    try { meta = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(j)); } catch (e) { return head; }
+    if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return head;
+    if (!mt) return 'm' in meta || 'c' in meta || 'cs' in meta ? head : null;   // a seal that no longer reads as one, or a sender that made none
+    const len = b.length - off, cs = meta.cs; let sums;
+    if (!Number.isInteger(cs) || cs < 1 || typeof meta.c !== 'string') return null;
+    try { sums = Uint8Array.from(atob(meta.c), ch => ch.charCodeAt(0)); } catch (e) { return null; }
+    if (sums.length !== Math.ceil(len / cs) * 4) return null;
+    const dv = new DataView(sums.buffer), blocks = [], chunks = [];
+    for (let i = 0; i * cs < len; i++) {
+      const a = off + i * cs, e = Math.min(b.length, a + cs); if (crc32of(b, a, e) === dv.getUint32(i * 4)) continue;
+      const [f, l] = span(a, e), last = blocks[blocks.length - 1]; chunks.push(i);
+      if (last && f <= last[1] + 1) last[1] = Math.max(last[1], l); else blocks.push([f, l]);
+    }
+    return blocks.length ? { meta: false, blocks, chunks } : null;
+  }
+  return { _int: { template, maskMap, bch, EXP, LOG, EC_L, BLOCKS_L, ALNUM, alignPos, countBits }, GEN, encode, capacity, symbolsIn, Stream, Collector, parseFrame, pack, unpack, seal, damaged, crc32of, chunkSize, chunkChecks, span, bodySpan, b45enc, b45dec, blocksOf, blockCount, SYMBOL, HEADER };
 });

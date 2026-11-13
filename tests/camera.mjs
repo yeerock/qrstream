@@ -1,6 +1,6 @@
 // Own camera simulator: turns module bitmaps (what the sender canvas holds) into camera pictures and writes them as a YUV4MPEG2 (.y4m) file,
 // the raw format Chrome accepts as a fake camera (--use-file-for-fake-video-capture). Projective tilt, rotation, blur, sensor noise, uneven light.
-import fs from 'node:fs';
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 export function shoot(bm, W, H, { fill = 0.9, rot = 0.02, persp = 0.04, blur = 1, noise = 18, light = 0.25, seed = 1 } = {}) {
   const k = Math.min(W * fill / bm.w, H * fill / bm.h), ox = (W - bm.w * k) / 2, oy = (H - bm.h * k) / 2, cx = W / 2, cy = H / 2;
   const c = Math.cos(-rot), s = Math.sin(-rot), g = new Float32Array(W * H);
@@ -18,8 +18,21 @@ export function shoot(bm, W, H, { fill = 0.9, rot = 0.02, persp = 0.04, blur = 1
 }
 /** Luma frames -> .y4m (4:2:0, neutral chroma). */
 export function writeY4M(file, W, H, fps, frames) {
+  // 4:2:0 halves both sides: an odd size or a short frame gives a file Chrome plays as garbage, with no error anywhere
+  if (!(W > 0 && H > 0) || W % 2 || H % 2) throw new Error(`writeY4M: the picture size must be even, got ${W}x${H}`);
+  if (!frames.length) throw new Error('writeY4M: no frames');
+  const bad = frames.findIndex(y => y.length !== W * H); if (bad >= 0) throw new Error(`writeY4M: frame ${bad} holds ${frames[bad].length} bytes, ${W}x${H} needs ${W * H}`);
   const fd = fs.openSync(file, 'w'), chroma = Buffer.alloc((W / 2) * (H / 2) * 2, 128);
-  fs.writeSync(fd, `YUV4MPEG2 W${W} H${H} F${fps}:1 Ip A1:1 C420jpeg\n`);
-  for (const y of frames) { fs.writeSync(fd, 'FRAME\n'); fs.writeSync(fd, y); fs.writeSync(fd, chroma); }
-  fs.closeSync(fd);
+  try {
+    fs.writeSync(fd, `YUV4MPEG2 W${W} H${H} F${fps}:1 Ip A1:1 C420jpeg\n`);
+    for (const y of frames) { fs.writeSync(fd, 'FRAME\n'); fs.writeSync(fd, y); fs.writeSync(fd, chroma); }
+  } finally { fs.closeSync(fd); }
+}
+/** A place for one camera feed, in a folder of its own: runs at the same time, and two feeds of one run, never share a file name.
+ *  Returns { file, remove() }. Feeds are 1.4 MB a picture at 1280x720, so whatever is still there when the process ends is removed too. */
+const feeds = new Set(); let hooked = false;
+export function feedFile(name = 'feed') {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'qrs-cam-')), rm = () => { feeds.delete(rm); try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { } };
+  feeds.add(rm); if (!hooked) { hooked = true; process.on('exit', () => { for (const f of [...feeds]) f(); }); }
+  return { file: path.join(dir, name + '.y4m'), remove: rm };
 }

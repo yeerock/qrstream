@@ -15,7 +15,7 @@ A screen and a camera form a **one-way, lossy, unordered channel**. The camera s
 ```
 file ──gzip?──► pack(meta + bytes) ──► 142-byte source blocks ──► erasure code symbols
      ──► frame = header(20 B) + n symbols ──► CRC-32 ──► Base45 text ──► QR (v15..v40, level L)
-     ──► 1–3 codes per screen ──► screen at 8–15 codes/s
+     ──► 1–8 codes per screen ──► screen at 8–15 codes/s
                       ⋮  light  ⋮
 camera ──► canvas pixels ──► Web Worker pool (own QR reader) ──► text ──► Base45 ──► CRC-32 check
      ──► erasure decoder ──► gunzip ──► SHA-256 check ──► preview / Open / Save / Share (OS share sheet)
@@ -28,6 +28,7 @@ camera ──► canvas pixels ──► Web Worker pool (own QR reader) ──�
 | Integrity per frame | CRC-32 (IEEE 802.3) | A QR misread into another valid QR never reaches the decoder. |
 | Erasure code | Systematic random linear fountain over GF(2), generations of 1,024 blocks | See section 3. |
 | Integrity of the file | SHA-256 of the original file | End-to-end proof, shown to the user. |
+| Locating damage | CRC-32 of the metadata and of each body chunk, carried in the metadata (fields `cs`, `c`, `m`; receivers that do not know them ignore them) | A wrong symbol that passed the frame CRC is found, and only the damaged blocks are read again. A repair symbol that adds no information must also cancel to zero data; one that does not is refused and counted. Limit: repair symbols are spread over all generations, so refilling one whole generation of a large file takes about as long as the file took; the saving is real for small files, light damage and damage in the metadata. |
 | Compression | gzip (CompressionStream) when it saves ≥ 10 % | Text, logs, CSV, JSON shrink 3 to 10×. Media are skipped. |
 
 ### Frame format (version 3)
@@ -81,7 +82,7 @@ Symbols needed beyond the file, in simulation with frame loss (`node tests/codec
 | 25 | 117 × 117 | 8 | 1,136 |
 | 15 | 77 × 77 | 3 | 426 |
 
-* **Several codes per screen.** The reader decodes up to 4 codes in one camera picture, so a 16:9 screen shows 2 and an ultra-wide one 3 (Auto picks from the aspect ratio). In the end-to-end test, a 300 KB file needed 140 screens with 1 code, 75 with 2 and 53 with 3.
+* **Several codes per screen.** The reader decodes up to 9 codes in one camera picture (8 stream codes and the entry code), so a wide screen shows two rows of four smaller codes, a square one a 2 by 2 grid, and a small one a single code. Many smaller codes fill a wide screen better than a few large ones: version 40 is 177 modules high and cannot use the rest of the height. In the end-to-end test (10 screens a second on the simulated camera) a 400 KB file took 8.0 s with two v40 codes and 7.0 s with eight v22 codes; an earlier run of a 300 KB file needed 140 screens with 1 code, 75 with 2 and 53 with 3.
 * **Rate.** 8 to 15 codes per second per slot. At 15/s each code is still on screen for about 2 camera frames at 30 fps, which avoids frames torn between two codes.
 * **No back channel, so Auto cycles.** The sender steps through five levels every 15 s. Symbols are 142 bytes at every level, so a change never invalidates what the receiver holds.
 * **Sharp pixels.** Every module is a whole number of device pixels (`image-rendering: pixelated`) with a 4-module quiet zone.
@@ -89,12 +90,12 @@ Symbols needed beyond the file, in simulation with frame loss (`node tests/codec
 
 ## 5. The QR reader (written for this stream)
 
-General-purpose readers spend most of their time on cases this stream never has. Ours knows the stream is level L, alphanumeric or byte mode, versions 10 to 40, and up to 4 codes in one picture (a row of up to 3, 2 stacked, or a 2 by 2 grid).
+General-purpose readers spend most of their time on cases this stream never has. Ours knows the stream is level L, alphanumeric or byte mode, versions 10 to 40, and up to 8 stream codes in one picture (one or two rows of up to 4) plus the sender's small entry code.
 
-1. **Binarise**: luma, then a threshold per 8×8 block averaged over its 5×5 neighbourhood (flat blocks lean to white), which handles glare and uneven light.
+1. **Binarise**: luma, then a threshold per 8×8 block taken over its 5×5 neighbourhood and weighted by contrast (blank white areas between stacked codes must not pull it toward white; the weighting fades out where white clips on an overexposed screen), which handles glare and uneven light.
 2. **Finder patterns**: row scans for 1:1:3:1:1 runs, confirmed vertically, horizontally again and diagonally. Repeated hits are merged and counted as confidence.
 3. **Triangles**: three finders that form a right isosceles triangle with matching module sizes, ranked by geometry error and confidence. A finder is claimed only by a successful decode, so several codes per picture work.
-4. **Size from timing patterns**: count the dark and light runs along module row 6 and column 6 between finder centres. A code of size *d* has exactly *d − 12* runs. This works under any perspective, rejects false triangles in a few hundred samples, and replaced trial decoding (the reader went from 122 ms to 25 ms per 1080p frame).
+4. **Size from timing patterns**: count the dark and light runs along module row 6 and column 6 between finder centres. A code of size *d* has exactly *d − 12* runs. This works under any perspective, rejects false triangles in a few hundred samples, and replaced trial decoding (the reader went from 122 ms to 25 ms per 1080p frame). A blurred timing module often shrinks to one pixel between two fat ones; short runs are merged only when they sit inside one module, a swallowed module counts as the modules it spans, and a second count on the grey picture gives a second opinion. Before this, 140 of 153 diagnosed misses on stacked and grid layouts were a size counted 4 too small. Measured on 2,940 synthetic camera pictures in seven layouts: 152 of 7,560 codes missed before, 0 after, no wrong text, mean read time 6 % lower.
 5. **Grid lock**: the fast lock finds six well-spread alignment patterns (centre of each band, centre, bottom right), refitting a least-squares homography (normalised DLT) after each one. If that decode fails, the full lock visits every alignment pattern nearest the finders first, and sampling can switch to one map per cell between alignment patterns (lens distortion, curved screens). Alignment positions are refined to 1/8 module.
 6. **Decode**: format and version information by nearest BCH code word (up to 3 bit errors), unmask, de-interleave, then Reed-Solomon per block (Berlekamp-Massey, Chien search, Forney; up to 15 byte errors per v40 block).
 
@@ -107,7 +108,7 @@ Tests (`tests/reader.test.mjs`) draw our own encoder's codes through a projectiv
 * The stream plays **A A A B A A B C** with 15, 12 and 10 codes per second. With a fountain code every frame adds information, so throughput follows the best tier the camera can read, with no probing and no waiting.
 * The receiver records which frame sizes it decodes. It says nothing while all is well, and asks the user to move closer, hold steadier or reduce glare only when the fast tier is not getting through.
 * Entry: the link code fills the stage for 2.5 s and then stays in a corner of the sender bar, so it costs the stream no time. The phone's camera app opens the receiver, which starts its camera by itself. Common picture, video, audio, PDF and text types save by themselves on Android and computers; other types wait for a tap.
-* Layouts: Smart mode tries every QR version from 10 to 40 in five shapes (a row of 1 to 3, 2 stacked, a 2 by 2 grid) and keeps what carries most. A layout must give modules of at least 3 device pixels and 2 CSS pixels and fit 560 by 315 modules, which is what a 1920 by 1080 camera picture resolves at about 3.4 pixels per module.
+* Layouts: Smart mode tries every QR version from 10 to 40 in one or two rows of 1 to 4 codes (up to 8 codes a screen) and keeps what carries most: on a Full HD screen two rows of four v22 codes carry 81 KB/s where two v40 codes carried 71. A layout must give modules of at least 3 device pixels and 2 CSS pixels and fit 560 by 315 modules, which is what a 1920 by 1080 camera picture resolves at about 3.4 pixels per module.
 
 ## 7. Receiver engineering
 
@@ -130,7 +131,8 @@ Tests (`tests/reader.test.mjs`) draw our own encoder's codes through a projectiv
 
 ## 9. Verification
 
-* `npm test`: the codec (Base45 against the RFC 9285 vector, QR capacity, CRC tamper rejection, decoding at 0 to 50 % frame loss with density changes) and the reader (see section 5).
+* `npm test`: the codec (Base45 against the RFC 9285 vector, QR capacity, CRC tamper rejection, decoding at 0 to 50 % frame loss with density changes), the reader (32 picture cases, see section 5), the decoder (edge sizes, bursty loss, late join, a hostile stream that never completes) and repair (a damaged source or repair symbol, damaged metadata, a forged frame, streams from senders without checks, the wire format against an older core).
+* `npm run ui`: the pages in a real browser: sender controls, text sending, reduced motion, refusal inside another site's frame, a stray screen of another stream, a real change of stream.
 * `npm run e2e`: **the real camera path**. The real sender page draws its stream, our camera simulator films each screen into a raw `.y4m` file, Chrome uses it as its webcam (`--use-file-for-fake-video-capture`), and the real receiver page decodes it and must match the SHA-256 with no CSP violation or exception. It is driven by our own Chrome DevTools Protocol client (`tests/cdp.mjs`).
 * Measured (this machine, through the camera path): 300 KB of random data in 11.9 / 6.8 / 4.7 s with 1 / 2 / 3 codes at 10 screens/s; 2.1 to 2.3 s (128 to 137 KB/s) at 3 codes and 30 screens/s; Smart mode 4.5 s on a 1080p screen and 7.0 s on 720p; a 334 KB log in 0.9 s.
 * `npm run demo-video`: builds `docs/demo.webm` from a real e2e run, recorded in Chrome with MediaRecorder.

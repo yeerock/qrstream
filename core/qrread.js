@@ -1,11 +1,14 @@
 'use strict';
 /* QRStream reader: own code, no library. Finds and decodes QR codes (Model 2, level L, alphanumeric and byte mode) in a camera picture.
    Steps (ISO/IEC 18004 annex on reference decoding, done our own way):
-   1. Luma, then a local threshold per 8x8 block averaged over its 5x5 block neighbourhood (handles uneven light and screen glare).
+   1. Luma, then a local threshold per 8x8 block (mean blended with mid-range), averaged over its 5x5 block neighbourhood weighted by block
+      contrast (handles uneven light and screen glare).
    2. Finder patterns: row scans for dark-light-dark-light-dark runs in ratio 1:1:3:1:1, confirmed by a vertical and a second horizontal scan.
    3. Finders grouped into codes: three centres that make a right isosceles triangle with matching module sizes (several codes per picture).
+      The timing patterns between the finders then prove the triangle and give the code's size (run count; the hills of the grey line as a second opinion).
    4. Geometry: a perspective map from the three finders plus the bottom-right alignment pattern; for version 2 and up, every alignment pattern is
-      located and each cell between them gets its own map, which absorbs lens distortion and a slightly curved screen.
+      located and each cell between them gets its own map, which absorbs lens distortion and a slightly curved screen. Modules are read from
+      the binary picture first and, when that does not decode, from the grey picture with a one-module sharpening step (small modules under blur).
    5. Format and version information: nearest valid BCH code word (corrects up to 3 bit errors).
    6. Unmask, de-interleave, Reed-Solomon decode per block (Berlekamp-Massey, Chien search, Forney), then the data segments.
    Needs core/qrtx.js (the encoder's tables). Works in a browser, a worker and Node. */
@@ -13,27 +16,33 @@
   const { template, maskMap, bch, EXP, LOG, EC_L, BLOCKS_L, ALNUM, alignPos, countBits } = QRTX._int;
 
   // ---- 1. binarize
+  const GREY = new WeakMap();   // binary picture -> its grey picture and block thresholds, for the grey sampler (step 4)
   function binarize(rgba, W, H) {
     const g = new Uint8Array(W * H);
     for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (rgba[j] * 77 + rgba[j + 1] * 150 + rgba[j + 2] * 29) >> 8;
-    const B = 8, bw = Math.ceil(W / B), bh = Math.ceil(H / B), avg = new Float32Array(bw * bh);
+    const B = 8, bw = Math.ceil(W / B), bh = Math.ceil(H / B), avg = new Float32Array(bw * bh), wt = new Float32Array(bw * bh);
     for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
-      let mn = 255, mx = 0, sum = 0, n = 0;
-      for (let y = by * B, ye = Math.min(H, y + B); y < ye; y++) for (let x = bx * B, xe = Math.min(W, x + B), o = y * W; x < xe; x++) { const v = g[o + x]; sum += v; n++; if (v < mn) mn = v; if (v > mx) mx = v; }
-      let a = sum / n;
+      let mn = 255, mx = 0, sum = 0, n = 0, sat = 0;
+      for (let y = by * B, ye = Math.min(H, y + B); y < ye; y++) for (let x = bx * B, xe = Math.min(W, x + B), o = y * W; x < xe; x++) { const v = g[o + x]; sum += v; n++; if (v < mn) mn = v; if (v > mx) mx = v; if (v >= 250) sat++; }
+      // half mean, half mid-range: the mean alone climbs next to a white margin (quiet zone, gap between codes) and then blurred edges turn dark,
+      // closing the one-module light ring of a finder there; the mid-range does not depend on how much of the block is dark
+      const kb = 0.5 * Math.max(0, 1 - 4 * sat / n); let a = sum / n * (1 - kb) + (mn + mx) / 2 * kb;
       if (mx - mn <= 24) {   // flat block: lean to white unless the neighbours say otherwise
         a = mn / 2;
         if (by > 0 && bx > 0) { const nb = (avg[(by - 1) * bw + bx] + 2 * avg[by * bw + bx - 1] + avg[(by - 1) * bw + bx - 1]) / 4; if (mn < nb) a = nb; }
       }
-      avg[by * bw + bx] = a;
+      // weight for the neighbourhood average: blocks that hold both ink and paper know the threshold; a blank block (paper plus noise) next to a
+      // code would drag it toward white, which fattens dark modules and closes finder rings along the quiet zone and between stacked codes
+      avg[by * bw + bx] = a; wt[by * bw + bx] = 1 + Math.min(Math.max(mx - mn - 24, 0), 96) / 4;
     }
-    const bin = new Uint8Array(W * H);
+    const bin = new Uint8Array(W * H), thr = new Float32Array(bw * bh);
     for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
       let s = 0, n = 0;
-      for (let dy = -2; dy <= 2; dy++) { const yy = by + dy; if (yy < 0 || yy >= bh) continue; for (let dx = -2; dx <= 2; dx++) { const xx = bx + dx; if (xx < 0 || xx >= bw) continue; s += avg[yy * bw + xx]; n++; } }
-      const t = s / n;
+      for (let dy = -2; dy <= 2; dy++) { const yy = by + dy; if (yy < 0 || yy >= bh) continue; for (let dx = -2; dx <= 2; dx++) { const xx = bx + dx; if (xx < 0 || xx >= bw) continue; const w = wt[yy * bw + xx]; s += avg[yy * bw + xx] * w; n += w; } }
+      const t = thr[by * bw + bx] = s / n;
       for (let y = by * B, ye = Math.min(H, y + B); y < ye; y++) for (let x = bx * B, xe = Math.min(W, x + B), o = y * W; x < xe; x++) bin[o + x] = g[o + x] <= t ? 1 : 0;
     }
+    GREY.set(bin, { g, thr, bw });
     return bin;
   }
 
@@ -101,7 +110,7 @@
       const A = p[h], o = p.filter((_, n) => n !== h), a = dist(A, o[0]), b = dist(A, o[1]);
       if (Math.abs(a - b) > Math.max(a, b) * 0.2) continue;
       const hyp = d[h], err = Math.abs(hyp - Math.hypot(a, b)) / hyp; if (err > 0.1) continue;
-      const side = (a + b) / 2 / ms; if (side < 13 || side > 175) continue;
+      const side = (a + b) / 2 / ms; if (side < 12 || side > 186) continue;   // 14 (v1) to 170 (v40) modules, with room for a module size read 8 % off
       let [B, C] = o; if ((B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x) < 0) [B, C] = [C, B];   // A top-left, B top-right, C bottom-left
       // rank: geometry error, then how often each finder was confirmed (finders seen on one scan line only are often random data)
       const weak = p.reduce((k, f) => k + (f.n < 2 ? 1 : 0) + (f.n < 3 ? 0.5 : 0), 0);
@@ -192,8 +201,8 @@
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (!P[j * n + i]) P[j * n + i] = apply(m, G[i], G[j]);
     return { m, G, P };
   }
-  /** Module matrix from a lock. cells = false: one homography; true: one map per cell between alignment patterns. */
-  function sample(bin, W, H, dim, L, cells) {
+  /** Module (x, y) -> picture point of its centre, from a lock. cells = false: one homography; true: one map per cell between alignment patterns. */
+  function centres(dim, L, cells) {
     let get = (x, y) => apply(L.m, x + 0.5, y + 0.5);
     if (cells && L.G) {
       const G = L.G, P = L.P, n = G.length, maps = new Map();
@@ -205,10 +214,35 @@
       const idx = u => { let i = 0; while (i < n - 2 && u >= G[i + 1]) i++; return i; };
       get = (x, y) => apply(cellMap(idx(x + 0.5), idx(y + 0.5)), x + 0.5, y + 0.5);
     }
-    const out = new Uint8Array(dim * dim);
+    return get;
+  }
+  /** Module matrix from a lock, read from the binary picture. */
+  function sample(bin, W, H, dim, L, cells) {
+    const get = centres(dim, L, cells), out = new Uint8Array(dim * dim);
     for (let y = 0; y < dim; y++) for (let x = 0; x < dim; x++) {
       const [px, py] = get(x, y), xx = Math.round(px), yy = Math.round(py);
       out[y * dim + x] = xx < 0 || yy < 0 || xx >= W || yy >= H ? 0 : bin[yy * W + xx];
+    }
+    return out;
+  }
+  /** Module matrix from the grey picture, for modules near the size of a pixel, where blur leaves a lone light module among dark ones (or the
+      reverse) on the wrong side of the threshold. Each module's grey value is pushed away from the mean of its four neighbours (a sharpening
+      step one module wide, which undoes most of the blur) and then compared with the local threshold. Null when the grey picture is not kept. */
+  function sampleGrey(bin, W, H, dim, L, cells, K = 1) {
+    const G = GREY.get(bin); if (!G) return null;
+    const { g, thr, bw } = G, v = new Float32Array(dim * dim), th = new Float32Array(dim * dim), at = centres(dim, L, cells);
+    for (let y = 0; y < dim; y++) for (let x = 0; x < dim; x++) {
+      const [px, py] = at(x, y), i = y * dim + x;
+      if (!(px >= 0 && py >= 0 && px <= W - 1 && py <= H - 1)) { v[i] = 255; th[i] = 128; continue; }   // outside the picture: light
+      const x0 = Math.min(W - 2, px | 0), y0 = Math.min(H - 2, py | 0), fx = px - x0, fy = py - y0, o = y0 * W + x0;
+      v[i] = (g[o] * (1 - fx) + g[o + 1] * fx) * (1 - fy) + (g[o + W] * (1 - fx) + g[o + W + 1] * fx) * fy;
+      th[i] = thr[(Math.round(py) >> 3) * bw + (Math.round(px) >> 3)];
+    }
+    const out = new Uint8Array(dim * dim);
+    for (let y = 0; y < dim; y++) for (let x = 0; x < dim; x++) {
+      const i = y * dim + x; let s = 0, n = 0;
+      if (x > 0) { s += v[i - 1]; n++; } if (x < dim - 1) { s += v[i + 1]; n++; } if (y > 0) { s += v[i - dim]; n++; } if (y < dim - 1) { s += v[i + dim]; n++; }
+      out[i] = v[i] + K * (v[i] - s / n) <= th[i] ? 1 : 0;
     }
     return out;
   }
@@ -226,8 +260,10 @@
     const A = []; for (let i = 0; i <= 5; i++) A.push(b(8, i)); A.push(b(8, 7), b(8, 8), b(7, 8)); for (let i = 9; i < 15; i++) A.push(b(14 - i, 8));
     const C = []; for (let i = 0; i < 8; i++) C.push(b(n - 1 - i, 8)); for (let i = 8; i < 15; i++) C.push(b(8, n - 15 + i));
     A.forEach((v, i) => { a |= v << i; }); C.forEach((v, i) => { c |= v << i; });
-    const r = nearest(a, FORMATS); return r !== null ? r : nearest(c, FORMATS);
+    return [nearest(a, FORMATS), nearest(c, FORMATS)];
   }
+  /** The level L format words the two copies give (level L is the level QRStream writes): none, one, or two when the copies disagree. */
+  const formats = (M, n) => format(M, n).filter((f, i, a) => f !== null && f >> 3 === 1 && a.indexOf(f) === i);
   function version(M, n) {
     let a = 0, c = 0;
     for (let i = 0; i < 18; i++) { const x = n - 11 + i % 3, y = Math.floor(i / 3); a |= M[y * n + x] << i; c |= M[x * n + y] << i; }
@@ -268,8 +304,11 @@
   // ---- 7. modules -> text
   function decodeMatrix(M, n) {
     const v = (n - 17) / 4; if (v < 1 || v > 40 || v !== Math.floor(v)) return null;
-    const f = format(M, n); if (f === null || (f >> 3) !== 1) return null;   // level L only, the level QRStream writes
-    const mask = f & 7, t = template(v), map = maskMap(v, mask), p = t.path, words = new Uint8Array(t.total);
+    for (const f of formats(M, n)) { const s = decodeWith(M, n, v, f & 7); if (s !== null) return s; }   // a damaged copy can pass for another word
+    return null;
+  }
+  function decodeWith(M, n, v, mask) {
+    const t = template(v), map = maskMap(v, mask), p = t.path, words = new Uint8Array(t.total);
     for (let i = 0; i < p.length && (i >> 3) < t.total; i++) if (M[p[i]] ^ map[p[i]]) words[i >> 3] |= 0x80 >> (i & 7);
     const nb = t.blocks, ec = t.ec, sLen = Math.floor(t.data / nb), nShort = nb - t.data % nb, blocks = [];
     for (let b = 0; b < nb; b++) blocks.push(new Uint8Array(sLen + (b < nShort ? 0 : 1) + ec));
@@ -293,24 +332,49 @@
 
   /** Size of the code from its timing patterns, perspective-proof: walk the line through module row 6 (and column 6) from finder centre to finder
       centre and count dark/light runs. Row 6 holds the finder's bottom edge, a light separator, d-16 alternating timing modules, a separator and
-      the next finder's edge: d - 12 runs. Returns the sizes both lines agree on (or each one's), [] when neither looks like a timing pattern. */
-  function timingDims(bin, W, H, t) {
+      the next finder's edge: d - 12 runs (counted so that a module shrunk or swallowed by blur still counts, see below; grey = true counts
+      the hills of the grey line instead). Returns the size both lines agree on (and then .agree is true) or each one's, [] when neither looks like a timing pattern. */
+  function timingDims(bin, W, H, t, grey) {
+    const G = grey && GREY.get(bin); if (grey && !G) return [];
+    const size = n => { const d = n + 12; return d >= 21 && d <= 177 && (d - 17) % 4 === 0 ? d : 0; };
     const runs = (a, b, toward, msA, msB) => {
       const ux = toward.x - a.x, uy = toward.y - a.y, ul = Math.hypot(ux, uy), ox = ux / ul, oy = uy / ul;
       const x0 = a.x + ox * 3 * msA, y0 = a.y + oy * 3 * msA, x1 = b.x + ox * 3 * msB, y1 = b.y + oy * 3 * msB;   // 3 modules from row 3 to row 6
       const len = Math.hypot(x1 - x0, y1 - y0), steps = Math.ceil(len * 2), seq = [];
+      if (grey) {
+        // modules near 2.5 pixels: blur keeps many timing modules from crossing the threshold, but each light one still makes a hill in the grey
+        // line. A hill counts when the line climbs, then falls, by more than a fifth of its own contrast (hysteresis, so noise ripples do not)
+        const g = G.g, v = new Float32Array(steps + 1);
+        for (let i = 0; i <= steps; i++) { const f = i / steps, px = x0 + (x1 - x0) * f, py = y0 + (y1 - y0) * f; if (!(px >= 0 && py >= 0 && px <= W - 1 && py <= H - 1)) return 0;
+          const xi = Math.min(W - 2, px | 0), yi = Math.min(H - 2, py | 0), fx = px - xi, fy = py - yi, o = yi * W + xi; v[i] = (g[o] * (1 - fx) + g[o + 1] * fx) * (1 - fy) + (g[o + W] * (1 - fx) + g[o + W + 1] * fx) * fy; }
+        const srt = Float32Array.from(v).sort(), delta = (srt[Math.floor(steps * 0.9)] - srt[Math.floor(steps * 0.1)]) * 0.2; if (delta < 3) return 0;
+        // both ends lie 3.5 modules deep in a finder edge, whose grey level ripples (corner darker than edge): walk from 3 modules in to 3 modules
+        // before the end and count the hills only. They are the two separators and the light timing modules: (d - 13) / 2 of them
+        const i0 = Math.round(6 * msA), i1 = steps - Math.round(6 * msB); let n = 0, dark = true, ext = v[i0];
+        for (let i = i0 + 1; i <= i1; i++) { if (dark) { if (v[i] < ext) ext = v[i]; else if (v[i] > ext + delta) { dark = false; ext = v[i]; n++; } } else if (v[i] > ext) ext = v[i]; else if (v[i] < ext - delta) { dark = true; ext = v[i]; } }
+        return size(2 * n + 1);
+      }
       for (let i = 0; i <= steps; i++) { const f = i / steps, xx = Math.round(x0 + (x1 - x0) * f), yy = Math.round(y0 + (y1 - y0) * f); seq.push(xx < 0 || yy < 0 || xx >= W || yy >= H ? 0 : bin[yy * W + xx]); }
       const min = Math.min(msA, msB) * 2 * 0.4;   // samples are half a pixel apart; runs under 0.4 module are noise
       const r = []; for (const v of seq) { if (r.length && r[r.length - 1][0] === v) r[r.length - 1][1]++; else r.push([v, 1]); }
-      for (let k = 1; k < r.length - 1;) { if (r[k][1] < min) { r[k - 1][1] += r[k][1] + r[k + 1][1]; r.splice(k, 2); } else k++; }
-      if (r[0][0] !== 1 || r[r.length - 1][0] !== 1) return 0;
-      const d = r.length + 12; return d >= 21 && d <= 177 && (d - 17) % 4 === 0 ? d : 0;
+      // a short run is noise only when it sits inside one module: joined with its neighbours it stays under 2 modules. A blurred timing module can
+      // shrink to one pixel between two fat ones (3 modules joined); dropping two of those gave a size 4 too small, a valid size that never decodes
+      for (let k = 1; k < r.length - 1;) { if (r[k][1] < min && r[k - 1][1] + r[k][1] + r[k + 1][1] < min * 4.5) { r[k - 1][1] += r[k][1] + r[k + 1][1]; r.splice(k, 2); } else k++; }
+      if (r.length < 9 || r[0][0] !== 1 || r[r.length - 1][0] !== 1) return 0;
+      // between the two finder edges every run is one module. Blur can also swallow a module whole: its neighbours then join into one run three
+      // modules long, which stands for three. Too many odd runs, or a longer one, and the line is not a timing pattern (random data fails here)
+      const lens = []; for (let k = 1; k < r.length - 1; k++) lens.push(r[k][1]);
+      const m = lens.slice().sort((p, q) => p - q)[lens.length >> 1]; let cnt = 2, odd = 0;
+      for (const l of lens) { if (l >= m * 4.2) return 0; if (l >= m * 2.2) { cnt += 3; odd++; } else { cnt++; if (l < m * 0.45) odd++; } }
+      if (odd * 4 > lens.length + 3) return 0;
+      return size(cnt);
     };
     const a = runs(t.tl, t.tr, t.bl, t.tl.ms, t.tr.ms), b = runs(t.tl, t.bl, t.tr, t.tl.ms, t.bl.ms);
-    return a && a === b ? [a] : [a, b].filter(Boolean);
+    const out = a && a === b ? [a] : grey ? [] : [a, b].filter(Boolean);   // the grey count is a second opinion: only when both lines agree
+    out.agree = a > 0 && a === b; return out;
   }
   /** ImageData-like {data, width, height} -> array of decoded texts (up to `max` codes). */
-  function read(img, max = 4) {
+  function read(img, max = 5) {
     const W = img.width, H = img.height, bin = binarize(img.data, W, H), fs = finders(bin, W, H);
     if (fs.length < 3) return [];
     const fs2 = fs.length > 40 ? fs.sort((a, b) => b.n - a.n).slice(0, 40) : fs;   // bound the triangle search
@@ -322,25 +386,38 @@
       const side = (dist(t.tl, t.tr) + dist(t.tl, t.bl)) / 2 / t.ms;
       let dim = Math.round(side) + 7; const r = dim & 3; dim += r === 0 ? 1 : r === 2 ? -1 : r === 3 ? -2 : 0;
       const tried = new Set(); let text = null;
-      const tryDim = d => {
+      const tryDim = (d, proven) => {
         if (d < 21 || d > 177 || tried.has(d)) return null; tried.add(d);
-        // fast lock first; the full grid lock (and then cell maps) only when that fails
-        const plans = (d - 17) / 4 < 2 ? [[false, false]] : [[false, false], [true, false], [true, true]]; let Lf = null;
-        for (const [full, cells] of plans) {
-          const L = full ? (Lf = Lf || lock(bin, W, H, t, d, true)) : lock(bin, W, H, t, d, false), M = sample(bin, W, H, d, L, cells);
-          if (d >= 45 && !full) { const vv = version(M, d); if (vv && vv * 4 + 17 !== d) return tryDim(vv * 4 + 17); }
+        // fast lock first: modules from the binary picture, then from the grey picture (small modules under blur)
+        const L0 = lock(bin, W, H, t, d, false); let ours = false;
+        for (const grey of [false, true]) {
+          const M = grey ? sampleGrey(bin, W, H, d, L0, false) : sample(bin, W, H, d, L0, false); if (!M) continue;
+          // the version blocks sit next to the finders, so they read true at a wrong size too; a misread version must not end the tries at d
+          if (d >= 45) { const vv = version(M, d); if (vv && vv * 4 + 17 !== d) { const s = tryDim(vv * 4 + 17, proven); if (s !== null) return s; } }
           const s = decodeMatrix(M, d); if (s !== null) return s;
+          ours = ours || formats(M, d).length > 0;
+        }
+        // now the costly part: the full grid lock, read with one map, with cell maps, and those from the grey picture. A triangle whose two timing
+        // lines did not agree on a size is rarely a code; it gets this far only when a fast read showed a level L format word (the format words
+        // sit next to the finders, so they read true even when the rest does not). Most random triangles end here
+        if (d < 25 || !(proven || ours)) return null;
+        const Lf = lock(bin, W, H, t, d, true);
+        for (const [cells, grey] of [[false, false], [true, false], [true, true]]) {
+          const M = grey ? sampleGrey(bin, W, H, d, Lf, cells) : sample(bin, W, H, d, Lf, cells), s = M && decodeMatrix(M, d); if (s != null) return s;
         }
         return null;
       };
       // timing patterns (row 6 and column 6 alternate dark/light between the finders) prove the triangle is a code and pick its size, for a few
       // hundred samples instead of a full decode attempt per guess
       const sizes = timingDims(bin, W, H, t);
-      if (!sizes.length && t.err < 0.05) sizes.push(dim);   // timing unreadable (heavy blur) but a clean triangle: try the geometric size once
-      for (const d of sizes) { text = tryDim(d); if (text !== null) break; }
+      for (const d of sizes) { text = tryDim(d, sizes.agree); if (text !== null) break; }
+      if (text === null) {   // second opinion from the grey picture (small modules), then, for a clean triangle, the geometric size once
+        const more = timingDims(bin, W, H, t, true), sure = more.agree && !tried.has(more[0]); if (!sizes.length && !more.length && t.err < 0.05) more.push(dim);
+        for (const d of more) { text = tryDim(d, sure); if (text !== null) break; }
+      }
       if (text !== null) { out.push(text); used.add(t.tl); used.add(t.tr); used.add(t.bl); }
     }
     return out;
   }
-  return { read, _: { binarize, finders, triples, decodeMatrix, rsFix, timingDims, sampler, lock, sample, findAlign, mapFor, apply } };
+  return { read, _: { binarize, finders, triples, decodeMatrix, rsFix, timingDims, sampler, lock, sample, sampleGrey, findAlign, mapFor, apply } };
 });

@@ -2,9 +2,10 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script src="guard.js?v=2.3.0"></script>
 <title>QRStream: send a file from a screen to a phone with QR codes, no network</title><meta name="description" content="Send any file from a screen to a phone as a video of QR codes. One way, no network, no pairing, no upload. Fountain coded and SHA-256 checked. Open source.">
 <meta name="theme-color" content="#0f1720"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<meta property="og:type" content="website"><meta property="og:title" content="QRStream: send a file from a screen to a phone with QR codes"><meta property="og:description" content="One way, no network, no pairing, no upload. Own QR reader and erasure code, zero dependencies, MIT."><meta property="og:url" content="https://yeerock.github.io/qrstream/"><meta property="og:image" content="https://yeerock.github.io/qrstream/docs/demo-poster.png"><meta name="twitter:card" content="summary_large_image"><link rel="stylesheet" href="site.css?v=2.2.2"></head>
+<meta property="og:type" content="website"><meta property="og:title" content="QRStream: send a file from a screen to a phone with QR codes"><meta property="og:description" content="One way, no network, no pairing, no upload. Own QR reader and erasure code, zero dependencies, MIT."><meta property="og:url" content="https://yeerock.github.io/qrstream/"><meta property="og:image" content="https://yeerock.github.io/qrstream/docs/demo-poster.png"><meta name="twitter:card" content="summary_large_image"><link rel="stylesheet" href="site.css?v=2.3.0"></head>
 <body>
 <header class="top"><a class="brand" href="./"><img src="icon.svg" alt="" width="28" height="28">QRStream<span class="by">by VYROX</span></a><nav><a class="go" href="send/">Send</a><a class="go" href="receive/">Receive</a><a href="#how">How</a><a href="#use">Use cases</a><a href="#when">When</a><a href="#demo">Demo</a><a href="https://github.com/yeerock/qrstream">GitHub</a></nav></header>
 
@@ -65,10 +66,10 @@
     <tr><th>Code</th><td>QR Model 2 (ISO/IEC 18004), alphanumeric mode, error level L, versions 15 to 40; own encoder</td></tr>
     <tr><th>Payload text</th><td>Base45 (RFC 9285): 2 bytes in 3 QR alphanumeric characters</td></tr>
     <tr><th>Erasure code</th><td>Systematic random linear fountain over GF(2) in generations of 1,024 blocks, interleaved source order, incremental Gaussian elimination with bounded memory; 142-byte symbols fixed across densities. Measured overhead 1 to 4 % at 20 to 50 % frame loss</td></tr>
-    <tr><th>Frame</th><td>20-byte header (magic, version, stream id, length, seed, CRC-32) + up to 20 symbols = 2,840 bytes per code at QR v40; 1 to 3 codes side by side per screen</td></tr>
+    <tr><th>Frame</th><td>20-byte header (magic, version, stream id, length, seed, CRC-32) + up to 20 symbols = 2,840 bytes per code at QR v40; 1 to 8 codes per screen, in one or two rows</td></tr>
     <tr><th>Smart mode</th><td>The sender measures its own screen, picks the densest layouts that stay readable, and weaves fast and safe frames into one stream (A A A B A A B C). The phone coaches the user only when needed. No settings.</td></tr>
-    <tr><th>Throughput</th><td>Raw per code: v40 at 15/s ≈ 42 KB/s. Up to 3 codes per screen and up to 30 screens per second (manual Extreme). Measured through the camera path with a camera simulator (not yet on physical phones): 300 KB random in 4.5 s with Smart on a 1080p screen (65 KB/s); 128 to 137 KB/s at 3 codes and 30 screens/s; a 334 KB log in 0.9 s thanks to gzip</td></tr>
-    <tr><th>Integrity</th><td>CRC-32 per frame, SHA-256 of the file</td></tr>
+    <tr><th>Throughput</th><td>Raw per code: v40 at 15/s ≈ 42 KB/s. Up to 8 codes per screen (two rows of four) and up to 30 screens per second (manual Extreme). Smart mode on a Full HD screen: up to 81 KB/s; on a 2560 × 1440 screen: up to 137 KB/s. Measured through the camera path with a camera simulator (not yet on physical phones): 300 KB random in 4.5 s with Smart on a 1080p screen (65 KB/s); 128 to 137 KB/s at 3 codes and 30 screens/s; a 334 KB log in 0.9 s thanks to gzip</td></tr>
+    <tr><th>Integrity</th><td>CRC-32 per frame, CRC-32 per chunk to locate damage, SHA-256 of the file</td></tr>
     <tr><th>Reader</th><td>Own QR reader in Web Workers: local-threshold binarisation, finder search, timing-pattern sizing, incremental alignment-grid lock with least-squares homography, per-cell maps, Reed-Solomon (Berlekamp-Massey, Forney). About 25 ms for three v40 codes in a 1080p picture</td></tr>
     <tr><th>Limits</th><td>Sender 10 MB; receiver refuses streams over 16 MB, stops inflating at 64 MB, and bounds decoder memory</td></tr>
     <tr><th>Browsers</th><td>Sender: any modern browser. Receiver: Chrome, Edge, Firefox, Safari 16.4 or later, with a camera; https or localhost. PDFs open in the device's own viewer</td></tr>
@@ -97,5 +98,5 @@
 </section>
 
 <footer><p>QRStream by <a href="https://vyrox.com/" rel="noopener">VYROX</a> · MIT licence · <a href="https://github.com/yeerock/qrstream/blob/main/docs/METHODOLOGY.md">Methodology</a> · <a href="https://github.com/yeerock/qrstream">Source</a></p></footer>
-<script src="core/qrtx.js?v=2.2.2"></script><script src="site.js?v=2.2.2"></script>
+<script src="core/qrtx.js?v=2.3.0"></script><script src="site.js?v=2.3.0"></script>
 </body></html>

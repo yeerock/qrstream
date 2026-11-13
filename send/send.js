@@ -40,7 +40,9 @@
     if (window.CompressionStream && !/^(image\/(jpeg|png|gif|webp|avif)|video\/|audio\/|application\/(zip|gzip|x-7z|vnd\.openxmlformats))/.test(meta.mime)) {
       try { const z = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()); if (z.length < bytes.length * 0.9) { body = z; zipped = true; meta.z = 'gzip'; } } catch (e) { }
     }
-    const data = QRTX.pack(meta, body), s = new QRTX.Stream(data, crypto.getRandomValues(new Uint32Array(1))[0]);
+    // seal = pack plus CRC-32 checks of consecutive chunks of the body as sent (metadata fields cs, c, m): a receiver that finds the SHA-256 wrong reads only the damaged chunks again.
+    // Receivers from before the checks ignore the fields. A name too long to leave room for them is sent without (the receiver then reads everything again, as before).
+    const data = QRTX.seal(meta, body), s = new QRTX.Stream(data, crypto.getRandomValues(new Uint32Array(1))[0]);
     const entry = QRTX.encode(RECEIVER), cv = $('qr');
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches && !TEST;   // people who asked for less motion start the flicker themselves
     let bigUntil = 0; let paused = still, timer = 0, last = 0, frames = 0, syms = 0, shownMs = 0, wl = null; const need = Math.ceil(data.length / QRTX.SYMBOL);
@@ -51,8 +53,8 @@
     const VERS = Array.from({ length: 31 }, (_, i) => 40 - i).filter(v => QRTX.symbolsIn(v) >= 1);   // every size from 40 down to 10: the planner keeps the one that carries most
     let plan = null;
     const dpr = () => devicePixelRatio || 1;
-    // layouts as [columns, rows]: a row of 1 to 3 codes, 2 stacked, or a 2 x 2 block. Smart mode picks whichever carries most on this screen's shape.
-    const GRIDS = [[1, 1], [2, 1], [3, 1], [1, 2], [2, 2]];
+    // layouts as [columns, rows]: rows of 1 to 4 codes, one or two rows high (so up to 8 codes). Smart mode picks whichever carries most on this screen's shape.
+    const GRIDS = [[1, 1], [2, 1], [3, 1], [4, 1], [1, 2], [2, 2], [3, 2], [4, 2]];   // up to 2 rows of 4: a wide screen is filled by many smaller codes
     const modPx = (v, c, r = 1) => { const b = $('stage').getBoundingClientRect(), n = v * 4 + 17 + 8; return Math.floor(Math.min((b.width - 8) * dpr() / (c * n), (b.height - 8) * dpr() / (r * n))); };
     // what a phone camera can resolve in one picture (1920 x 1080 at about 3.4 pixels per module): the whole layout must fit in 560 x 315 modules
     const filmable = (v, c, r) => { const n = v * 4 + 17 + 8, a = c * n, b = r * n; return Math.max(a, b) <= 560 && Math.min(a, b) <= 315; };
@@ -133,14 +135,17 @@
   });
 
   // demo files, drawn here so the repo needs no binary samples
+  // The demo picture is a Full HD photo-like picture of a few hundred KB, so the speed shows; automated tests (?test) use a small one to stay quick.
   function demoPicture() {
-    const c = document.createElement('canvas'); c.width = 960; c.height = 540; const x = c.getContext('2d');
+    const k = TEST ? 1 : 2, W = 960 * k, H = 540 * k, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); x.scale(k, k);
     const g = x.createLinearGradient(0, 0, 960, 540); g.addColorStop(0, '#2f7bf6'); g.addColorStop(1, '#3ecf8e'); x.fillStyle = g; x.fillRect(0, 0, 960, 540);
     for (let i = 0; i < 40; i++) { x.fillStyle = `hsla(${(i * 37) % 360},80%,70%,.35)`; x.beginPath(); x.arc((i * 211) % 960, (i * 137) % 540, 20 + (i * 13) % 90, 0, 7); x.fill(); }
-    x.fillStyle = '#fff'; x.font = 'bold 72px system-ui,sans-serif'; x.textAlign = 'center'; x.fillText('Sent by light', 480, 260);
-    x.font = '32px system-ui,sans-serif'; x.fillText('QRStream demo · ' + new Date().toISOString().slice(0, 10), 480, 320);
-    return new Promise(r => c.toBlob(b => r(new File([b], 'qrstream-demo.jpg', { type: 'image/jpeg' })), 'image/jpeg', 0.82));
+    if (!TEST) for (let i = 0; i < 2600; i++) { x.fillStyle = `hsla(${(i * 53) % 360},85%,${45 + (i * 7) % 40}%,.5)`; x.fillRect((i * 389) % 960, (i * 241) % 540, 2 + (i * 5) % 9, 2 + (i * 3) % 9); }   // fine detail, as a photo has
+    x.fillStyle = '#fff'; x.shadowColor = '#0008'; x.shadowBlur = 12; x.font = 'bold 72px system-ui,sans-serif'; x.textAlign = 'center'; x.fillText('Sent by light', 480, 260);
+    x.font = '32px system-ui,sans-serif'; x.fillText('QRStream by VYROX · ' + new Date().toISOString().slice(0, 10), 480, 320);
+    return new Promise(r => c.toBlob(b => r(new File([b], 'qrstream-demo.jpg', { type: 'image/jpeg' })), 'image/jpeg', TEST ? 0.82 : 0.9));
   }
+
   function demoText() {
     const t = 'QRStream demo file\n\n' + Array.from({ length: 120 }, (_, i) => `Line ${i + 1}: a file can travel from a screen to a phone as a stream of QR codes, one way, with no network.`).join('\n') + '\n';
     return new File([t], 'qrstream-demo.txt', { type: 'text/plain' });

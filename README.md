@@ -62,7 +62,7 @@ flowchart LR
   B --> E[Erasure code: endless symbols]
   E --> FR[Frames: header + symbols + CRC-32]
   FR --> T[Base45 text]
-  T --> Q[QR codes v10 to v40, 1 to 4 per screen]
+  T --> Q[QR codes v10 to v40, 1 to 8 per screen]
   Q --> S((Screen))
   S -. light .-> C((Phone camera))
   C --> W[Worker pool: own QR reader]
@@ -76,7 +76,7 @@ flowchart LR
 1. **Pack.** The file (gzipped first if that saves at least 10 %) is packed with its name, type and SHA-256, then cut into 142-byte blocks.
 2. **Encode.** The erasure code turns the blocks into an endless stream of symbols. The first symbols are the file itself; after them, every symbol is a fresh combination.
 3. **Frame.** Up to 20 symbols go into one frame with a 20-byte header and a CRC-32, written as Base45 text, the densest text a QR code holds reliably.
-4. **Show.** Each frame becomes a QR code (own encoder, ISO/IEC 18004). Smart mode places 1 to 4 codes in a row or a grid and plays 10 to 15 screens a second.
+4. **Show.** Each frame becomes a QR code (own encoder, ISO/IEC 18004). Smart mode places 1 to 8 codes in one or two rows and plays 10 to 15 screens a second.
 5. **Film.** The phone films the screen. A pool of Web Workers runs our own QR reader on each camera picture, about 25 ms for three codes in a 1080p frame.
 6. **Rebuild.** Frames that fail the CRC are dropped. The decoder solves for the blocks as symbols arrive, by incremental Gaussian elimination per generation: each symbol is reduced against the rows already held as it arrives.
 7. **Prove.** The file is unzipped and its SHA-256 must match. Then it appears in the camera box, ready to use.
@@ -101,7 +101,7 @@ sequenceDiagram
 
 There is no back channel, so the sender cannot ask the phone what it reads best. Instead the stream **optimises itself**:
 
-1. **The sender measures its own screen** in real device pixels, and lists every layout whose modules are at least 3 device pixels wide, at least 2 CSS pixels wide (physical size, so a high-density phone screen does not get codes too small to film), and that fits what a phone camera resolves in one picture (560 × 315 modules). A layout is a QR version from 10 to 40 in one of five shapes: a row of 1, 2 or 3 codes, 2 stacked, or a **2 × 2 grid of four codes**. The shape that carries the most on that screen wins: rows on wide screens, the grid on square ones.
+1. **The sender measures its own screen** in real device pixels, and lists every layout whose modules are at least 3 device pixels wide, at least 2 CSS pixels wide (physical size, so a high-density phone screen does not get codes too small to film), and that fits what a phone camera resolves in one picture (560 × 315 modules). A layout is a QR version from 10 to 40 in **one or two rows of 1 to 4 codes, so up to 8 codes a screen**. The shape that carries the most on that screen wins: a wide screen is filled by two rows of four smaller codes, a square one by a 2 × 2 grid, a laptop by two large codes.
 2. **It picks three tiers:**
    * **A**: the highest-capacity layout with modules of at least 4 px (fast).
    * **B**: the best layout below A with at least 5 px (safer).
@@ -116,10 +116,12 @@ Examples measured by the sender itself:
 
 | Screen | Smart chooses |
 |---|---|
-| 2560 × 1440 monitor | 3 × QR v40, up to 105 KB/s |
-| 1920 × 1080 monitor | 2 × QR v40 (A), safer B and C woven in, up to 71 KB/s |
-| 1440 × 900 laptop | 2 × QR v38, up to 57 KB/s |
+| 2560 × 1440 monitor | 4 × 2 grid of QR v28 (8 codes), up to 137 KB/s |
+| 1920 × 1080 monitor | 4 × 2 grid of QR v22 (8 codes), safer layouts woven in, up to 81 KB/s |
+| 1440 × 900 window, 2 device pixels per CSS pixel | 4 × 2 grid of QR v28, up to 134 KB/s |
+| 1440 × 900 window, 1 device pixel per CSS pixel | 2 × QR v38, up to 57 KB/s |
 | 1080 × 1080 square screen | 2 × 2 grid of QR v22, up to 41 KB/s |
+| 390 × 844 phone, 3 device pixels per CSS pixel | 2 stacked QR v24, up to 23 KB/s |
 | 390 × 844 window at 1 device pixel per CSS pixel | 1 × QR v15 |
 
 The rates are the sender's own figure for a camera that reads every code.
@@ -128,7 +130,7 @@ Manual levels remain for lab use:
 
 | Level | Codes per second | Bytes per code |
 |---|---|---|
-| **Smart (default)** | 15 / 12 / 10, mixed | best fit, 1 to 4 codes |
+| **Smart (default)** | 15 / 12 / 10, mixed | best fit, 1 to 8 codes |
 | Extreme+ / Extreme | 30 / 20 | 2,840 (v40) |
 | Turbo / Max | 15 / 12 | 2,840 (v40) |
 | High / Medium / Low | 12 / 10 / 8 | 1,846 / 1,136 / 426 |
@@ -171,10 +173,10 @@ The receiver previews pictures, video, text, and the start of Word, Excel and Po
 | Erasure code | Systematic random linear fountain over GF(2), generations of 1,024 blocks, interleaved sources, incremental Gaussian elimination with bounded memory |
 | Symbol size | 142 bytes, the same at every QR version, so density changes lose nothing |
 | Frame | 20-byte header + up to 20 symbols = 2,840 bytes per code at QR v40 |
-| Codes per screen | 1 to 4: a row of 1 to 3, 2 stacked, or a 2 × 2 grid; 4-module quiet zone |
+| Codes per screen | 1 to 8: one or two rows of 1 to 4 codes; 4-module quiet zone |
 | Rate | 8 to 30 codes per second (Smart: 10, 12, 15) |
 | Raw throughput per code | v40: 42 KB/s at 15/s · v33: 22 KB/s · v25: 11 KB/s · v15: 3.3 KB/s |
-| Integrity | CRC-32 per frame, SHA-256 of the whole file |
+| Integrity | CRC-32 per frame; CRC-32 of the metadata and of each body chunk (to find damage); SHA-256 of the whole file |
 | Compression | gzip (browser CompressionStream) when it saves ≥ 10 % |
 | Reader | Own QR reader in 1 to 3 Web Workers, camera frames scaled to ≤ 1,920 px |
 | Limits | Sender 10 MB; receiver refuses streams over 16 MB, gzip output over 64 MB |
@@ -223,14 +225,14 @@ Background: random linear network coding (Ho et al., IEEE Trans. Inf. Theory 52(
 
 Written for this stream (`core/qrread.js`):
 
-1. **Binarise:** a local threshold per 8×8 block, averaged over its 5×5 neighbourhood. It handles glare and uneven light.
+1. **Binarise:** a local threshold per 8×8 block, taken over its 5×5 neighbourhood and weighted by contrast, so blank white areas between stacked codes do not pull it toward white; the weighting fades out where white clips (an overexposed screen). It handles glare and uneven light.
 2. **Finder patterns:** row scans for 1:1:3:1:1 runs, confirmed vertically, horizontally and diagonally.
 3. **Triangles:** three finders forming a right isosceles triangle with matching module size, ranked by geometry and confidence. Several codes per picture work.
-4. **Size from timing patterns:** count the runs along module row 6 and column 6. A code of size *d* has exactly *d − 12* runs. This works under any perspective and rejects false triangles cheaply. It made the reader 5× faster.
+4. **Size from timing patterns:** count the runs along module row 6 and column 6. A code of size *d* has exactly *d − 12* runs. This works under any perspective and rejects false triangles cheaply. Blurred timing modules that shrink to one pixel are merged only inside one module, and a second count on the grey picture gives a second opinion; this removed nearly all misses on stacked and grid layouts. It made the reader 5× faster.
 5. **Grid lock:** fast lock on six well-spread alignment patterns with a least-squares homography (normalised DLT). If needed, a full lock visits every alignment pattern nearest the finders first, then samples with one map per cell (lens distortion, curved screens). Alignment is refined to 1/8 module.
 6. **Decode:** format and version by nearest BCH code word, unmask, de-interleave, then Reed-Solomon per block (Berlekamp-Massey, Chien search, Forney).
 
-Tested with rotation, 180°, perspective, blur, sensor noise, uneven light, three codes per picture and 120 damaged modules. The floor is about 3 px per module.
+Tested with rotation, 180°, perspective, blur, sensor noise, uneven light, three codes per picture, stacked codes, 2 × 2 grids, a grid with the small entry code beside it, and 120 damaged modules. On synthetic camera pictures the reader misses none of 7,560 codes across seven layouts and reads down to about 2.5 px per module; Smart mode still keeps 3 px as its floor.
 
 ---
 
@@ -263,7 +265,8 @@ A packed transfer is `[u16 JSON length][JSON {name, mime, sha256, size, z?, titl
 | Wrong file shown by a hostile screen | SHA-256 proves error-free delivery, not origin. Both screens show an 8-character check code to compare. |
 | Unwanted downloads | Only common picture, video, audio, PDF and text types save by themselves; other types wait for a tap. |
 | Misleading names | Control and direction-override characters are removed from the title and name. |
-| Framing (clickjacking) | Pages refuse to show inside a frame from another site. |
+| Framing (clickjacking) | The first script on every page hides it when another site frames it. |
+| A damaged symbol that passes the frame CRC | The sender adds a CRC-32 of the metadata and of each body chunk. On a failed check the receiver forgets only the damaged blocks and keeps reading. Small files and light damage recover in a few frames; for a multi-megabyte file it costs about one more pass, because repair symbols are spread over the whole file (a property of the format). |
 | Decompression bombs | gunzip is streamed and capped at 64 MB; document previews count the inflated bytes and stop at 4 MB. |
 | Unsafe file names | Reduced to `[A-Za-z0-9_.-]`, no leading dots, at most 120 characters. |
 | Supply chain | No third-party code, no CDN, no npm packages, no build step. |
@@ -307,7 +310,7 @@ if (collector?.done) { const { meta, file } = QRTX.unpack(collector.bytes()); /*
 No packages to install: Node 22+ and Google Chrome.
 
 ```bash
-npm test             # codec (Base45, CRC, decoding under 0-50 % loss) + reader (blur, tilt, perspective, noise, 3 codes, damage)
+npm test             # codec, reader (32 picture cases), decoder (edge sizes, late join, hostile stream), repair (damaged symbols)
 npm run ui           # the pages in a real browser: sender controls, text sending, reduced motion, framing, a second stream in view
 npm run e2e          # sender -> simulated camera (.y4m fake webcam) -> receiver; SHA-256 must match
 FILE=tests/fixtures/hostile.html EXPECT_TYPE=text/plain npm run e2e   # a hostile HTML file arrives inert
