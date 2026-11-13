@@ -20,13 +20,14 @@ export function shoot(bm, W, H, { fill = 0.9, rot = 0.02, persp = 0.04, blur = 1
 export function writeY4M(file, W, H, fps, frames) {
   // 4:2:0 halves both sides: an odd size or a short frame gives a file Chrome plays as garbage, with no error anywhere
   if (!(W > 0 && H > 0) || W % 2 || H % 2) throw new Error(`writeY4M: the picture size must be even, got ${W}x${H}`);
-  if (!frames.length) throw new Error('writeY4M: no frames');
-  const bad = frames.findIndex(y => y.length !== W * H); if (bad >= 0) throw new Error(`writeY4M: frame ${bad} holds ${frames[bad].length} bytes, ${W}x${H} needs ${W * H}`);
   const fd = fs.openSync(file, 'w'), chroma = Buffer.alloc((W / 2) * (H / 2) * 2, 128);
+  let n = 0, ok = false;   // frames may be any iterable (an array, a generator); each is checked as it is written
   try {
     fs.writeSync(fd, `YUV4MPEG2 W${W} H${H} F${fps}:1 Ip A1:1 C420jpeg\n`);
-    for (const y of frames) { fs.writeSync(fd, 'FRAME\n'); fs.writeSync(fd, y); fs.writeSync(fd, chroma); }
-  } finally { fs.closeSync(fd); }
+    for (const y of frames) { if (y.byteLength !== W * H) throw new Error(`writeY4M: frame ${n} holds ${y.byteLength} bytes, ${W}x${H} needs ${W * H}`); fs.writeSync(fd, 'FRAME\n'); fs.writeSync(fd, y); fs.writeSync(fd, chroma); n++; }
+    if (!n) throw new Error('writeY4M: no frames');
+    ok = true;
+  } finally { fs.closeSync(fd); if (!ok) fs.rmSync(file, { force: true }); }
 }
 /** A place for one camera feed, in a folder of its own: runs at the same time, and two feeds of one run, never share a file name.
  *  Returns { file, remove() }. Feeds are 1.4 MB a picture at 1280x720, so whatever is still there when the process ends is removed too. */

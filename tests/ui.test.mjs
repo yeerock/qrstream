@@ -107,10 +107,10 @@ try {
     assert.equal(log.lens.length, 1, 'the receiver left the picture stream: ' + JSON.stringify(log)); assert.equal(log.falls, 0, 'progress fell back: ' + JSON.stringify(log));
   });
   await t('receiver: when the screen really changes to another file, it follows', async () => {
-    // 3 s of P (8 screens over and over: never enough to finish P), then 9 s of T, in a loop. Wherever reading starts, the receiver ends on T:
-    // from P it follows to T; from late in T it is taken back by the 3 s of P and then follows to T again with 9 s to finish it (T needs about 1 s).
-    // The test proves the switch only when P was collected before T finished, so a run that began inside T and finished there is filmed again.
-    const { P, T } = await streams(), hold = Array.from({ length: 30 }, (_, i) => P[i % 8]); let got;
+    // 8 s of P (8 screens over and over: never enough to finish P), then T. Chrome's file camera starts at the first picture of the file every time, so the
+    // receiver begins inside P and must follow to T. The test proves the switch only when P was collected before T finished; a run where the receiver
+    // started so late that it began inside T is filmed again.
+    const { P, T } = await streams(), hold = Array.from({ length: 80 }, (_, i) => P[i % 8]); let got;
     for (let i = 0; i < 3 && !(got && got.log.lens.length > 1); i++) { if (got) console.log('note: the receiver began inside the second stream and finished it there; filming again to see the switch'); got = await receive([...hold, ...T, ...T, ...T]); assert.equal(got.r.name, 'qrstream-demo.txt'); }
     assert.ok(got.log.lens.length > 1, 'in 3 runs the receiver never collected the first stream before the second finished, so the switch was not tested: ' + JSON.stringify(got.log));
   });

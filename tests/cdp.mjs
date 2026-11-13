@@ -52,7 +52,8 @@ export async function launch(extraArgs = []) {
   const close = () => closing ||= (async () => {
     if (ws && !closed) { try { await send('Browser.close', {}, undefined, 5000); } catch (e) { } }
     drop('the browser was closed'); try { if (ws) ws.close(); } catch (e) { }
-    await Promise.race([gone, sleep(3000)]); if (!exited) { try { proc.kill('SIGKILL'); } catch (e) { } await Promise.race([gone, sleep(2000)]); }
+    const within = ms => { let tm; return Promise.race([gone, new Promise(r => { tm = setTimeout(r, ms); })]).finally(() => clearTimeout(tm)); };   // the timer is cleared, or Node would stay alive for it
+    await within(3000); if (!exited) { try { proc.kill('SIGKILL'); } catch (e) { } await within(2000); }
     await removeDir(dir); live.delete(me);
   })();
 
@@ -89,7 +90,7 @@ export async function launch(extraArgs = []) {
       // waits for a truthy value; script errors on the way are expected (the page is still loading) and the last one is named on timeout
       async waitFor(expr, ms = 60000) {
         const t = Date.now(); let last = '';
-        for (;;) { let v; try { v = await api.eval(expr); last = ''; } catch (e) { if (closed) throw e; last = e.message.split('\n')[0]; } if (v) return v; if (Date.now() - t > ms) throw new Error(`timeout waiting for ${expr} (${Math.round(ms / 1000)} s${last ? ', last error: ' + last : ''})`); await sleep(100); }
+        for (;;) { let v; try { v = await api.eval(expr); last = ''; } catch (e) { if (closed) throw e; last = e.message.split('\n')[0]; } if (v) return v; if (Date.now() - t > ms) throw new Error(`timeout waiting for ${expr} (${ms / 1000} s${last ? ', last error: ' + last : ''})`); await sleep(100); }
       },
       /** Pictures the camera video has received so far, -1 while no camera runs. */
       cameraFrames: () => api.eval(CAM),
@@ -102,7 +103,7 @@ export async function launch(extraArgs = []) {
           let v; try { v = await api.eval(expr); last = ''; } catch (e) { if (closed) throw e; last = e.message.split('\n')[0]; } if (v) return v;
           const c = await api.eval(CAM).catch(() => -1); if (c !== n) { n = c; moved = Date.now(); }
           else if (c >= 0 && Date.now() - moved > FREEZE_MS) throw Object.assign(new Error(`Chrome's fake camera froze after ${c} pictures (the camera track is live but no new picture arrives)`), { code: 'CAMERA_FROZEN' });
-          if (Date.now() - t > ms) throw new Error(`timeout waiting for ${expr} (${Math.round(ms / 1000)} s${last ? ', last error: ' + last : ''})`);
+          if (Date.now() - t > ms) throw new Error(`timeout waiting for ${expr} (${ms / 1000} s${last ? ', last error: ' + last : ''})`);
           if (each) await each(); else await sleep(100);
         }
       },
