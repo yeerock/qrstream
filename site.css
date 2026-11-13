@@ -5,7 +5,7 @@ a{color:#8fb8ff}section{max-width:1080px;margin:0 auto;padding:56px 16px}section
 h1{font-size:clamp(32px,5vw,52px);line-height:1.08;letter-spacing:-.02em;margin:8px 0 16px}h2{font-size:28px;letter-spacing:-.01em;margin:0 0 20px}h3{font-size:18px;margin:0 0 6px}p{margin:0 0 12px}
 .top{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;background:#0b1118e6;backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:8px;color:var(--fg);font-weight:700;text-decoration:none}nav{display:flex;gap:16px;flex-wrap:wrap}nav a{color:var(--mut);text-decoration:none;font-size:15px}nav a:hover{color:var(--fg)}
-@media (max-width:640px){nav a:not(:last-child){display:none}}
+nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}@media (max-width:640px){nav a:not(.go){display:none}}@media (min-width:641px){nav a.go{display:none}}
 .hero{display:grid;grid-template-columns:1.2fr 1fr;gap:40px;align-items:center;padding-top:64px}@media (max-width:820px){.hero{grid-template-columns:1fr}}
 .eyebrow{color:var(--ok);font-weight:600;font-size:14px}.hl{background:linear-gradient(90deg,#6ea8ff,var(--ok));-webkit-background-clip:text;background-clip:text;color:transparent}
 .lead{color:var(--mut);font-size:18px}.small{color:var(--mut);font-size:14px}.note{color:var(--mut)}
@@ -21,3 +21,5 @@ video{width:100%;max-width:960px;display:block;border-radius:14px;background:#00
 .checks{padding-left:20px}.checks li{margin:0 0 8px;color:var(--mut)}code{background:#ffffff12;padding:1px 6px;border-radius:5px;overflow-wrap:anywhere}
 details{border-bottom:1px solid var(--line);padding:12px 0}summary{cursor:pointer;font-weight:600}details p{color:var(--mut);margin:8px 0 0}
 footer{text-align:center;color:var(--mut);padding:32px 16px;border-top:1px solid var(--line)}
+:root{--acc:#1f63d8;--line:#5b6b7c}.card,.steps li,.top,.spec th,.spec td,details,footer{border-color:#243241}:focus-visible{outline:3px solid #8fb8ff;outline-offset:2px}
+summary{min-height:44px;display:list-item;padding:10px 0}details{padding:2px 0}footer a{display:inline-block;padding:12px 4px}.btn.primary{color:#fff}

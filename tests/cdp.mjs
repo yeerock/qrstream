@@ -8,7 +8,7 @@ const CHROME = process.env.CHROME || [
 
 export async function launch(extraArgs = []) {
   if (!CHROME) throw new Error('Chrome not found. Set CHROME=/path/to/chrome.');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agq-chrome-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'qrs-chrome-'));
   const proc = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--hide-scrollbars', '--mute-audio', ...extraArgs], { stdio: 'ignore' });
   const portFile = path.join(dir, 'DevToolsActivePort'); let port;
   for (let i = 0; i < 200 && !port; i++) { await new Promise(r => setTimeout(r, 50)); if (fs.existsSync(portFile)) port = fs.readFileSync(portFile, 'utf8').split('\n')[0]; }

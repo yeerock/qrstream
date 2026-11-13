@@ -61,7 +61,7 @@ flowchart LR
   B --> E[Erasure code: endless symbols]
   E --> FR[Frames: header + symbols + CRC-32]
   FR --> T[Base45 text]
-  T --> Q[QR codes v15 to v40, 1 to 3 per screen]
+  T --> Q[QR codes v10 to v40, 1 to 4 per screen]
   Q --> S((Screen))
   S -. light .-> C((Phone camera))
   C --> W[Worker pool: own QR reader]
@@ -75,7 +75,7 @@ flowchart LR
 1. **Pack.** The file (gzipped first if that saves at least 10 %) is packed with its name, type and SHA-256, then cut into 142-byte blocks.
 2. **Encode.** The erasure code turns the blocks into an endless stream of symbols. The first symbols are the file itself; after them, every symbol is a fresh combination.
 3. **Frame.** Up to 20 symbols go into one frame with a 20-byte header and a CRC-32, written as Base45 text, the densest text a QR code holds reliably.
-4. **Show.** Each frame becomes a QR code (own encoder, ISO/IEC 18004). Smart mode places 1 to 3 codes side by side and plays 10 to 15 screens a second.
+4. **Show.** Each frame becomes a QR code (own encoder, ISO/IEC 18004). Smart mode places 1 to 4 codes in a row or a grid and plays 10 to 15 screens a second.
 5. **Film.** The phone films the screen. A pool of Web Workers runs our own QR reader on each camera picture, about 25 ms for three codes in a 1080p frame.
 6. **Rebuild.** Frames that fail the CRC are dropped. The decoder solves for the blocks as symbols arrive, by peeling plus Gauss-Jordan elimination per generation.
 7. **Prove.** The file is unzipped and its SHA-256 must match. Then it appears in the camera box, ready to use.
@@ -84,7 +84,7 @@ flowchart LR
 sequenceDiagram
   participant S as Sender screen
   participant P as Phone
-  S->>S: show link code (1.5 s every 10 s)
+  S->>S: show link code (2.5 s, then in a corner)
   P->>P: camera app opens the receiver link
   P->>P: receiver starts its camera by itself
   loop until the phone has enough symbols
@@ -100,7 +100,7 @@ sequenceDiagram
 
 There is no back channel, so the sender cannot ask the phone what it reads best. Instead the stream **optimises itself**:
 
-1. **The sender measures its own screen** in real device pixels, and lists every layout (QR version × codes side by side) whose modules are at least 3 pixels wide.
+1. **The sender measures its own screen** in real device pixels, and lists every layout whose modules are at least 3 device pixels wide, at least 2 CSS pixels wide (physical size, so a high-density phone screen does not get codes too small to film), and that fits what a phone camera resolves in one picture (560 × 315 modules). A layout is a QR version from 10 to 40 in one of five shapes: a row of 1, 2 or 3 codes, 2 stacked, or a **2 × 2 grid of four codes**. The shape that carries the most on that screen wins: rows on wide screens, the grid on square ones.
 2. **It picks three tiers:**
    * **A**: the highest-capacity layout with modules of at least 4 px (fast).
    * **B**: the best layout below A with at least 5 px (safer).
@@ -108,21 +108,26 @@ There is no back channel, so the sender cannot ask the phone what it reads best.
 3. **It weaves them into one stream**, `A A A B A A B C`, at 15, 12 and 10 codes a second.
 4. Because every frame carries fresh erasure-coded data, **nothing is wasted**. A good camera reads everything and runs near A's speed; a weak camera reads only B and C and still finishes. There's no probing and no waiting.
 5. **The phone coaches only when needed.** It knows which frame sizes it decodes. If only the safe tier gets through, it asks the user to move closer or hold steady. If it sees nothing, it suggests reducing glare.
-6. **Entry is automatic.** The link code shows for 1.5 s every 10 s, so a phone can join at any moment. The phone's camera app opens the receiver, which starts its own camera. Android and computers save the file at once; iPhone needs one tap (Apple's rule for downloads).
+6. **Entry is automatic.** The link code fills the stage for the first 2.5 s and then stays in a corner of the sender bar, so a phone can join at any moment and the stream loses no time to it. The phone's camera app opens the receiver, which starts its own camera. On Android and computers, common pictures, video, audio, PDF and text files save at once; any other type waits for a tap, and iPhone always needs one tap (Apple's rule for downloads).
+7. **Both sides show what is happening.** The sender shows the time shown, the pass number, the time a phone needs, the top speed and a check code; it turns green once a phone that saw everything has enough. The receiver shows percent, bytes, live KB/s and time left, and the final speed on the result.
 
 Examples measured by the sender itself:
 
 | Screen | Smart chooses |
 |---|---|
-| 1920 × 1080 monitor | 2 × QR v40 (A), safer B and C woven in |
-| 1440 × 900 laptop | 2 × QR v33 |
-| 390 × 844 phone as sender | 1 × QR v15 |
+| 2560 × 1440 monitor | 3 × QR v40, up to 105 KB/s |
+| 1920 × 1080 monitor | 2 × QR v40 (A), safer B and C woven in, up to 71 KB/s |
+| 1440 × 900 laptop | 2 × QR v38, up to 57 KB/s |
+| 1080 × 1080 square screen | 2 × 2 grid of QR v22, up to 41 KB/s |
+| 390 × 844 window at 1 device pixel per CSS pixel | 1 × QR v15 |
+
+The rates are the sender's own figure for a camera that reads every code.
 
 Manual levels remain for lab use:
 
 | Level | Codes per second | Bytes per code |
 |---|---|---|
-| **Smart (default)** | 15 / 12 / 10, mixed | best fit, 1 to 3 codes |
+| **Smart (default)** | 15 / 12 / 10, mixed | best fit, 1 to 4 codes |
 | Extreme+ / Extreme | 30 / 20 | 2,840 (v40) |
 | Turbo / Max | 15 / 12 | 2,840 (v40) |
 | High / Medium / Low | 12 / 10 / 8 | 1,846 / 1,136 / 426 |
@@ -165,7 +170,7 @@ The receiver previews pictures, video, text, and the start of Word, Excel and Po
 | Erasure code | Systematic random linear fountain over GF(2), generations of 1,024 blocks, interleaved sources, Gauss-Jordan decoding |
 | Symbol size | 142 bytes, the same at every QR version, so density changes lose nothing |
 | Frame | 20-byte header + up to 20 symbols = 2,840 bytes per code at QR v40 |
-| Codes per screen | 1 to 3, side by side, 4-module quiet zone |
+| Codes per screen | 1 to 4: a row of 1 to 3, 2 stacked, or a 2 × 2 grid; 4-module quiet zone |
 | Rate | 8 to 30 codes per second (Smart: 10, 12, 15) |
 | Raw throughput per code | v40: 42 KB/s at 15/s · v33: 22 KB/s · v25: 11 KB/s · v15: 3.3 KB/s |
 | Integrity | CRC-32 per frame, SHA-256 of the whole file |
@@ -173,7 +178,7 @@ The receiver previews pictures, video, text, and the start of Word, Excel and Po
 | Reader | Own QR reader in 1 to 3 Web Workers, camera frames scaled to ≤ 1,920 px |
 | Limits | Sender 10 MB; receiver refuses streams over 16 MB, gzip output over 64 MB |
 | Offline | Service worker; the receiver works with no signal after one visit |
-| Browsers | Sender: any modern browser. Receiver: Chrome, Edge, Firefox, Safari (iOS 15+), with a camera; https or localhost |
+| Browsers | Sender: any modern browser. Receiver: Chrome, Edge, Firefox, Safari 16.4 or later, with a camera; https or localhost |
 | Dependencies | **None.** Node 22+ and Chrome for the tests only |
 
 ---
@@ -250,9 +255,14 @@ A packed transfer is `[u16 JSON length][JSON {name, mime, sha256, size, z?, titl
 | Threat | Mitigation |
 |---|---|
 | A hostile file runs script when opened | MIME allowlist: HTML, SVG, XML and JavaScript open as `text/plain`, unknown types as bytes. Tested end to end with a hostile HTML file. |
-| Data leaves the device | No server. Strict CSP: `default-src 'self'`, `connect-src 'self' blob:`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`, no referrer. |
-| Forged or corrupted frames | Magic, version and CRC-32 checks. A length over 16 MB is ignored. |
-| Decompression bombs | gunzip is streamed and capped at 64 MB; preview ZIP entries over 20 MB are skipped. |
+| Data leaves the device | No server. Strict CSP: `default-src 'self'`, `connect-src 'self'`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`, no referrer. |
+| Forged or corrupted frames | Magic, version and CRC-32 checks. A length under 3 bytes or over 16 MB is ignored. Malformed metadata is rejected. |
+| Another stream in view | The receiver switches streams only after 3 codes in a row from the new one, so a stray code cannot wipe a transfer. |
+| Wrong file shown by a hostile screen | SHA-256 proves error-free delivery, not origin. Both screens show an 8-character check code to compare. |
+| Unwanted downloads | Only common picture, video, audio, PDF and text types save by themselves; other types wait for a tap. |
+| Misleading names | Control and direction-override characters are removed from the title and name. |
+| Framing (clickjacking) | Pages refuse to show inside a frame from another site. |
+| Decompression bombs | gunzip is streamed and capped at 64 MB; document previews count the inflated bytes and stop at 4 MB. |
 | Unsafe file names | Reduced to `[A-Za-z0-9_.-]`, no leading dots, at most 120 characters. |
 | Supply chain | No third-party code, no CDN, no npm packages, no build step. |
 | Shoulder surfing | Inherent to light: anyone filming the screen receives the file. Encrypt first for secrets. |
@@ -321,8 +331,19 @@ demo/               builds docs/demo.webm from a real end-to-end run
 
 ---
 
+## FAQ and troubleshooting
+
+* **Send text?** Open *Send text instead* on the sender, or paste. A copied picture can be pasted too.
+* **Several files?** One at a time: put them in one zip file.
+* **Stuck or slow?** Fill the camera view with the screen, hold still, tilt a little against glare, raise the screen brightness. If only the slower codes get through, move closer.
+* **The phone looked away.** Point it back; what was read is kept. *Stop* keeps it too, until *Discard*.
+* **Dark room or a dim panel?** Phones that allow it show a *Light* button for the torch.
+* **Keyboard on the sender:** Space pauses, F is full screen, Esc stops.
+* **Flashing:** the codes flicker quickly. People who set *reduce motion* get a *Start stream* button instead of an automatic start.
+
 ## Limits and roadmap
 
+* Decoder memory grows with the number of repair symbols held. A phone that joins a multi-megabyte stream late, after the source symbols have passed, can use a lot of memory; a more compact equation store is the next engine change.
 * Not yet measured with physical cameras across phone models. The numbers above come from the camera simulator, which models tilt, blur, noise and light but not rolling shutter or screen flicker. Field results will be added.
 * Colour codes (three channels) could triple density again, with a decoder robust to camera white balance.
 * An optional optical back channel could make Smart mode closed-loop.

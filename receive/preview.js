@@ -5,19 +5,23 @@ const Preview = (() => {
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const card = (box, name) => { const ext = (name.split('.').pop() || 'file').toUpperCase().slice(0, 5); box.innerHTML = `<div class="pcard"><b>${esc(ext)}</b>${esc(name)}</div>`; };
   /** ZIP central directory (APPNOTE 4.3.12) -> path -> async text. Stored and deflated entries. */
+  const LIMIT = 4 * 1048576;
   function zip(buf) {
     const d = new DataView(buf), u = new Uint8Array(buf); let e = buf.byteLength - 22;
     while (e >= 0 && d.getUint32(e, true) !== 0x06054b50) e--;
     if (e < 0) throw new Error('not a zip');
     const out = {}; let p = d.getUint32(e + 16, true);
     for (let i = 0, n = d.getUint16(e + 10, true); i < n; i++) {
-      const method = d.getUint16(p + 10, true), size = d.getUint32(p + 20, true), nl = d.getUint16(p + 28, true), xl = d.getUint16(p + 30, true), cl = d.getUint16(p + 32, true), lo = d.getUint32(p + 42, true);
+      const method = d.getUint16(p + 10, true), size = d.getUint32(p + 20, true), full = d.getUint32(p + 24, true), nl = d.getUint16(p + 28, true), xl = d.getUint16(p + 30, true), cl = d.getUint16(p + 32, true), lo = d.getUint32(p + 42, true);
       const name = new TextDecoder().decode(u.subarray(p + 46, p + 46 + nl));
-      if (size > 20 * 1048576) { p += 46 + nl + xl + cl; continue; }   // zip bomb guard: previews only read small parts
+      if (size > LIMIT || full > LIMIT) { p += 46 + nl + xl + cl; continue; }   // zip bomb guard: a preview reads only parts that are small before and after inflating
       out[name] = async () => {
         const st = lo + 30 + d.getUint16(lo + 26, true) + d.getUint16(lo + 28, true), raw = u.subarray(st, st + size);
         if (!method) return new TextDecoder().decode(raw);
-        return new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+        // the declared size can lie, so the inflated bytes are counted and cut off at the limit
+        const rd = new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader(), parts = []; let n = 0;
+        for (;;) { const { done, value } = await rd.read(); if (done) break; n += value.length; if (n > LIMIT) { rd.cancel(); throw new Error('too big'); } parts.push(value); }
+        return new TextDecoder().decode(await new Blob(parts).arrayBuffer());
       };
       p += 46 + nl + xl + cl;
     }

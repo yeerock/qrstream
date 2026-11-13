@@ -89,7 +89,7 @@ Symbols needed beyond the file, in simulation with frame loss (`node tests/codec
 
 ## 5. The QR reader (written for this stream)
 
-General-purpose readers spend most of their time on cases this stream never has. Ours knows the stream is level L, alphanumeric or byte mode, versions 15 to 40, and up to 3 codes side by side.
+General-purpose readers spend most of their time on cases this stream never has. Ours knows the stream is level L, alphanumeric or byte mode, versions 10 to 40, and up to 4 codes in one picture (a row of up to 3, 2 stacked, or a 2 by 2 grid).
 
 1. **Binarise**: luma, then a threshold per 8×8 block averaged over its 5×5 neighbourhood (flat blocks lean to white), which handles glare and uneven light.
 2. **Finder patterns**: row scans for 1:1:3:1:1 runs, confirmed vertically, horizontally again and diagonally. Repeated hits are merged and counted as confidence.
@@ -106,7 +106,8 @@ Tests (`tests/reader.test.mjs`) draw our own encoder's codes through a projectiv
 * **A** is the highest-capacity layout with at least 4 px per module, **B** the best one with at least 5 px below A, and **C** a safe one with at least 7 px.
 * The stream plays **A A A B A A B C** with 15, 12 and 10 codes per second. With a fountain code every frame adds information, so throughput follows the best tier the camera can read, with no probing and no waiting.
 * The receiver records which frame sizes it decodes. It says nothing while all is well, and asks the user to move closer, hold steadier or reduce glare only when the fast tier is not getting through.
-* Entry: every 10 s the link code shows for 1.5 s. The phone's camera app opens the receiver, which starts its camera by itself and saves the file by itself on Android and computers.
+* Entry: the link code fills the stage for 2.5 s and then stays in a corner of the sender bar, so it costs the stream no time. The phone's camera app opens the receiver, which starts its camera by itself. Common picture, video, audio, PDF and text types save by themselves on Android and computers; other types wait for a tap.
+* Layouts: Smart mode tries every QR version from 10 to 40 in five shapes (a row of 1 to 3, 2 stacked, a 2 by 2 grid) and keeps what carries most. A layout must give modules of at least 3 device pixels and 2 CSS pixels and fit 560 by 315 modules, which is what a 1920 by 1080 camera picture resolves at about 3.4 pixels per module.
 
 ## 7. Receiver engineering
 
@@ -120,9 +121,9 @@ Tests (`tests/reader.test.mjs`) draw our own encoder's codes through a projectiv
 | Threat | Mitigation |
 |---|---|
 | Hostile file runs script when opened | MIME allowlist. HTML, SVG, XML and JavaScript become `text/plain`, unknown types become `application/octet-stream`. Tested with a hostile HTML file through the full pipeline. |
-| Data leaves the device | No server. CSP `default-src 'self'`, `connect-src 'self' blob:`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`, and no referrer. |
-| Forged or corrupted frames | Magic, version and CRC-32 checks. A length over 16 MB is ignored, so there is no huge allocation. |
-| Decompression bombs | gunzip is streamed and capped at 64 MB. Preview ZIP entries over 20 MB are skipped. |
+| Data leaves the device | No server. CSP `default-src 'self'`, `connect-src 'self'`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`, and no referrer. |
+| Forged or corrupted frames | Magic, version and CRC-32 checks. A length under 3 bytes or over 16 MB is ignored. Decoder memory still grows with the repair symbols held (see Limits). |
+| Decompression bombs | gunzip is streamed and capped at 64 MB. Document previews count the inflated bytes and stop at 4 MB. |
 | Unsafe filenames | Names are reduced to `[A-Za-z0-9_.-]` with no leading dots, at most 120 characters. |
 | Supply chain | No third-party code at all, no CDN, no build step, no npm packages (not even for tests). |
 | Shoulder surfing | Inherent to an optical link: anyone filming the screen receives the file. Do not stream secrets on a screen others can see. Encrypt first if needed. |

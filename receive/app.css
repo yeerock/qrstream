@@ -42,3 +42,13 @@ li button{min-height:44px;padding:0 12px;border-radius:8px;border:1px solid var(
 #lanb{min-height:44px;margin:6px 0 0}
 .crumb{margin:0 0 4px;font-size:14px}.crumb a{color:var(--mut);text-decoration:none}.crumb a:hover{color:var(--fg)}
 .pcard small{display:block;margin-top:8px;color:#556;font-size:13px}
+
+/* 2.1: status text, focus, contrast, small screens */
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#homenote{color:var(--mut)}.fine{font-size:13px;color:var(--mut)}#dhash{font-variant-numeric:tabular-nums}
+:focus-visible{outline:3px solid #8fb8ff;outline-offset:2px}#dtitle:focus{outline:0}
+:root{--line:#5b6b7c;--acc:#1f63d8}.tick{background:#15803d}.bar{background:#ffffff55}
+#torch{min-height:44px;margin:8px 0 0}#torch[aria-pressed=true]{background:#ffd479;color:#111;border-color:#ffd479}
+.crumb a{display:inline-block;padding:12px 4px;min-height:44px}
+.acts{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+@media (orientation:landscape){.guide{width:min(86%,150vh);aspect-ratio:16/9}}

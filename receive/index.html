@@ -1,17 +1,17 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>QRStream Receiver</title><meta name="description" content="Receive a file by filming a stream of QR codes. Nothing is uploaded."><meta name="theme-color" content="#0f1720"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="../icon.svg"><link rel="stylesheet" href="app.css"></head>
+<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; worker-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>QRStream Receiver</title><meta name="description" content="Receive a file by filming a stream of QR codes. Nothing is uploaded."><meta name="theme-color" content="#0f1720"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="../icon.svg"><link rel="apple-touch-icon" href="../icons/apple-touch-icon.png"><link rel="stylesheet" href="app.css"></head>
 <body>
 <section id="home"><p class="crumb"><a href="../">QRStream</a></p><h1>Receive a file</h1>
 <p>Point this device's camera at the moving QR codes on the sender screen. The file arrives through the camera, is checked with SHA-256 and stays on this device. Nothing is uploaded.</p>
 <button id="start" class="primary">Start Camera</button>
 <label class="secondary">Use a Video of the Code<input id="pick" type="file" accept="video/*" hidden></label>
-<p id="homemsg" class="msg" role="alert"></p>
-<h2 id="histh" hidden>On this device</h2><ul id="hist"></ul></section>
+<p id="homemsg" class="msg" role="alert"></p><p id="homenote" role="status"></p><button id="discard" class="link" hidden>Discard the partly read file</button>
+<h2 id="histh" hidden>On this device</h2><p id="histnote" class="fine" hidden>Kept only in this browser. Nothing is uploaded.</p><ul id="hist"></ul><button id="clear" class="link" hidden>Delete all</button></section>
 <section id="scan" hidden><div id="box"><video id="v" playsinline muted autoplay></video><div class="guide"></div><div id="prev" hidden></div></div>
-<div id="live" class="panel"><div class="big"><b id="pct" hidden>0%</b><span id="bytes"></span></div><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="barw"><i id="fill"></i></div><p id="stat" aria-live="polite">Point the camera at the code on the screen</p><p id="hint"></p>
-<label id="camw" hidden>Camera<select id="cam"></select></label><label id="zoomw" hidden>Zoom<input id="zoom" type="range"></label><button id="stop">Cancel</button></div>
-<div id="result" class="panel" hidden><h1 id="dtitle"><span class="tick" aria-hidden="true">&#10003;</span>Transfer successful</h1><p id="dname"></p>
+<div id="live" class="panel"><div class="big"><b id="pct" hidden>0%</b><span id="bytes"></span></div><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="File received" id="barw"><i id="fill"></i></div><p id="stat">Point the camera at the code on the screen</p><p id="hint" role="status"></p><p id="say" class="sr" role="status"></p>
+<label id="camw" hidden>Camera<select id="cam"></select></label><label id="zoomw" hidden>Zoom<input id="zoom" type="range"></label><button id="torch" class="secondary" aria-pressed="false" hidden>Light</button><button id="stop">Stop</button></div>
+<div id="result" class="panel" hidden><h1 id="dtitle" tabindex="-1"><span class="tick" aria-hidden="true">&#10003;</span>Transfer successful</h1><p id="dname"></p><p id="dhash" class="fine" hidden></p>
 <div class="acts"><button id="open" class="primary">Open</button><button id="save" class="primary">Save</button><button id="share" class="secondary">Share</button><button id="mail" class="secondary">Email</button></div><p id="savemsg" role="status"></p><button id="again" class="link">Done</button></div></section>
 <script src="../core/qrtx.js"></script><script src="preview.js"></script><script src="app.js"></script>
 </body></html>
