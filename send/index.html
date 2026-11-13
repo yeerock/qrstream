@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<script src="../guard.js?v=2.3.1"></script>
-<title>QRStream Sender</title><meta name="description" content="Send any file to a phone as a video of QR codes. No network, no pairing, no upload."><meta name="theme-color" content="#0f1720"><link rel="icon" href="../icon.svg"><link rel="apple-touch-icon" href="../icons/apple-touch-icon.png"><link rel="stylesheet" href="send.css?v=2.3.1"></head>
+<script src="../guard.js?v=2.4.0"></script>
+<title>QRStream Sender</title><meta name="description" content="Send any file to a phone as a video of QR codes. No network, no pairing, no upload."><meta name="theme-color" content="#0f1720"><link rel="icon" href="../icon.svg"><link rel="apple-touch-icon" href="../icons/apple-touch-icon.png"><link rel="stylesheet" href="send.css?v=2.4.0"></head>
 <body>
 <main id="pickview">
   <p class="crumb"><a href="../">QRStream <span class="by">by VYROX</span></a></p>
@@ -22,11 +22,12 @@
     <div class="ctl">
       <details id="opts"><summary>Settings</summary><div class="optrow">
       <label>Density <select id="lvl"><option value="auto">Smart (auto)</option><option value="0">Extreme+ (v40, 30/s)</option><option value="1">Extreme (v40, 20/s)</option><option value="2">Turbo (v40, 15/s)</option><option value="3">Max (v40, 12/s)</option><option value="4">High (v33, 12/s)</option><option value="5">Medium (v25, 10/s)</option><option value="6">Low (v15, 8/s)</option></select></label>
-      <label>Codes <select id="k"><option value="auto">Auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option><option value="8">8</option></select></label></div></details>
+      <label>Codes <select id="k"><option value="auto">Auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option><option value="8">8</option></select></label>
+      <label>Colour <select id="col"><option value="auto">Auto</option><option value="off">Off</option><option value="only">Every frame</option></select></label></div></details>
       <div class="btns"><button id="pause" title="Space">Pause</button><button id="fs" title="F">Full screen</button><button id="close" class="primary" title="Esc">Stop</button></div>
     </div>
   </div>
   <p id="ssay" class="sr" role="status"></p>
 </div>
-<script src="../core/qrtx.js?v=2.3.1"></script><script src="send.js?v=2.3.1"></script>
+<script src="../core/qrtx.js?v=2.4.0"></script><script src="send.js?v=2.4.0"></script>
 </body></html>

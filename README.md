@@ -27,12 +27,13 @@ One way · no network · no pairing · no app · no upload · <b>zero dependenci
 6. [Specifications](#specifications)
 7. [Measured performance](#measured-performance)
 8. [The erasure code](#the-erasure-code)
-9. [The QR reader](#the-qr-reader)
-10. [Frame format](#frame-format)
-11. [Security and privacy](#security-and-privacy)
-12. [Run it, embed it, test it](#run-it-yourself)
-13. [Project layout](#project-layout)
-14. [Limits and roadmap](#limits-and-roadmap)
+9. [Colour frames](#colour-frames)
+10. [The QR reader](#the-qr-reader)
+11. [Frame format](#frame-format)
+12. [Security and privacy](#security-and-privacy)
+13. [Run it, embed it, test it](#run-it-yourself)
+14. [Project layout](#project-layout)
+15. [Limits and roadmap](#limits-and-roadmap)
 
 ---
 
@@ -221,6 +222,29 @@ Background: random linear network coding (Ho et al., IEEE Trans. Inf. Theory 52(
 
 ---
 
+## Colour frames
+
+A black and white square carries one code. A **colour frame** puts three codes of the same size into the red, green and blue channels of the same squares, so one square carries three times the data.
+
+* **Why the reader still finds it.** The finder, timing, alignment, format and version patterns are the same in all three codes, so they stay black and white. The reader locates the square and its grid from brightness exactly as before, then reads the data from the colour picture.
+* **Undoing what the camera does to colour.** A camera does not see the screen's red, green and blue apart: each channel picks up part of the other two, white balance and exposure scale them, and this changes across the picture. In each tile of about 32 by 32 modules the reader learns the mixing from the modules themselves (a least-squares fit of `seen colour = dark level + MIX × bits`, started from several guesses, the best fit kept), inverts it, and sharpens by one module. No calibration marks are needed.
+* **Never a risk to the transfer.** Smart mode gives colour frames 3 of every 8 slots (K K A B K A B C) and only where modules are at least 5 device pixels and colour then carries more than black and white. Every frame carries fresh data, so a phone that cannot read colour simply ignores those frames and finishes on the others. Older receivers do the same.
+* **Settings.** *Colour*: Auto (default), Off, or Every frame (for trials). `send/?col=off` and `send/?col=only` set it from the address.
+
+Measured through the camera path (simulated camera, 10 screens a second, 400 KB of random data, Full HD sender):
+
+| Colour | Time | Rate |
+|---|---|---|
+| Off | 6.2 s | 63 KB/s |
+| Auto (woven) | 4.1 s | 95 KB/s |
+| Every frame | 2.9 s | 134 KB/s |
+
+The sender's own figure on a Full HD screen rises from about 87 to 122 KB/s (Auto) and 200 KB/s (every frame).
+
+**What this is not yet.** The simulated camera models uneven channel mixing, a colour cast, noise of its own in each channel, blur, and colour kept at half resolution (4:2:0). In that model colour reads at the full three times down to 3 pixels per module, and breaks under very heavy noise at 3 pixels, under extreme mixing with strong blur, and below about 2.75 pixels. Real phones add things the model does not have (the sensor's colour mosaic, video compression, screen sub-pixels, moiré). Colour has not been measured on a physical phone; that test decides whether Auto stays the default.
+
+---
+
 ## The QR reader
 
 Written for this stream (`core/qrread.js`):
@@ -312,6 +336,7 @@ No packages to install: Node 22+ and Google Chrome.
 ```bash
 npm test             # codec, reader (32 picture cases), decoder (edge sizes, late join, hostile stream), repair (damaged symbols)
 npm run ui           # the pages in a real browser: sender controls, text sending, reduced motion, framing, a second stream in view
+COLOUR=only npm run e2e:wide   # every frame in colour (COLOUR=off: none)
 npm run e2e:wide     # the same on a Full HD sender, where Smart mode shows 8 codes a screen
 npm run e2e          # sender -> simulated camera (.y4m fake webcam) -> receiver; SHA-256 must match
 FILE=tests/fixtures/hostile.html EXPECT_TYPE=text/plain npm run e2e   # a hostile HTML file arrives inert
@@ -353,7 +378,7 @@ demo/               builds docs/demo.webm from a real end-to-end run
 
 * Not yet measured with physical cameras across phone models. The numbers above come from the camera simulator, which models tilt, blur, noise and light but not rolling shutter or screen flicker. Field results will be added.
 * Generations are 1,024 blocks plus a remainder; a small last generation gets few repair symbols and can make the last blocks of some file sizes slow to arrive. Equal-size generations fix this but change the block mapping, so they need a new format version.
-* Colour codes (three channels) could triple density again, with a decoder robust to camera white balance.
+* Colour frames are measured only with the simulated camera so far; a test on physical phones decides whether they stay on by default. Four or more levels per channel could add more still.
 * An optional optical back channel could make Smart mode closed-loop.
 
 ## Licence

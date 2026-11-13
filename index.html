@@ -2,10 +2,10 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<script src="guard.js?v=2.3.1"></script>
+<script src="guard.js?v=2.4.0"></script>
 <title>QRStream: send a file from a screen to a phone with QR codes, no network</title><meta name="description" content="Send any file from a screen to a phone as a video of QR codes. One way, no network, no pairing, no upload. Fountain coded and SHA-256 checked. Open source.">
 <meta name="theme-color" content="#0f1720"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<meta property="og:type" content="website"><meta property="og:title" content="QRStream: send a file from a screen to a phone with QR codes"><meta property="og:description" content="One way, no network, no pairing, no upload. Own QR reader and erasure code, zero dependencies, MIT."><meta property="og:url" content="https://yeerock.github.io/qrstream/"><meta property="og:image" content="https://yeerock.github.io/qrstream/docs/demo-poster.png"><meta name="twitter:card" content="summary_large_image"><link rel="stylesheet" href="site.css?v=2.3.1"></head>
+<meta property="og:type" content="website"><meta property="og:title" content="QRStream: send a file from a screen to a phone with QR codes"><meta property="og:description" content="One way, no network, no pairing, no upload. Own QR reader and erasure code, zero dependencies, MIT."><meta property="og:url" content="https://yeerock.github.io/qrstream/"><meta property="og:image" content="https://yeerock.github.io/qrstream/docs/demo-poster.png"><meta name="twitter:card" content="summary_large_image"><link rel="stylesheet" href="site.css?v=2.4.0"></head>
 <body>
 <header class="top"><a class="brand" href="./"><img src="icon.svg" alt="" width="28" height="28">QRStream<span class="by">by VYROX</span></a><nav><a class="go" href="send/">Send</a><a class="go" href="receive/">Receive</a><a href="#how">How</a><a href="#use">Use cases</a><a href="#when">When</a><a href="#demo">Demo</a><a href="https://github.com/yeerock/qrstream">GitHub</a></nav></header>
 
@@ -67,6 +67,7 @@
     <tr><th>Payload text</th><td>Base45 (RFC 9285): 2 bytes in 3 QR alphanumeric characters</td></tr>
     <tr><th>Erasure code</th><td>Systematic random linear fountain over GF(2) in generations of 1,024 blocks, interleaved source order, incremental Gaussian elimination with bounded memory; 142-byte symbols fixed across densities. Measured overhead 1 to 4 % at 20 to 50 % frame loss</td></tr>
     <tr><th>Frame</th><td>20-byte header (magic, version, stream id, length, seed, CRC-32) + up to 20 symbols = 2,840 bytes per code at QR v40; 1 to 8 codes per screen, in one or two rows</td></tr>
+    <tr><th>Colour frames</th><td>Three codes in the red, green and blue channels of the same squares carry three times the data. The reader learns and undoes the camera's colour mixing per tile, with no calibration marks. Smart mode weaves colour frames in where the squares are large enough; a phone that cannot read them finishes on the black and white frames. Simulated camera, 400 KB on a Full HD sender: 6.2 s without colour, 4.1 s woven, 2.9 s with colour on every frame. Not yet measured on physical phones.</td></tr>
     <tr><th>Smart mode</th><td>The sender measures its own screen, picks the densest layouts that stay readable, and weaves fast and safe frames into one stream (A A A B A A B C). The phone coaches the user only when needed. No settings.</td></tr>
     <tr><th>Throughput</th><td>Raw per code: v40 at 15/s ≈ 42 KB/s. Up to 8 codes per screen (two rows of four) and up to 30 screens per second (manual Extreme). Smart mode on a Full HD screen: up to 87 KB/s; on a 2560 × 1440 screen: up to 131 KB/s. Measured through the camera path with a camera simulator (not yet on physical phones): 300 KB random in 4.5 s with Smart on a 1080p screen (65 KB/s); 128 to 137 KB/s at 3 codes and 30 screens/s; a 334 KB log in 0.9 s thanks to gzip</td></tr>
     <tr><th>Integrity</th><td>CRC-32 per frame, CRC-32 per chunk to locate damage, SHA-256 of the file</td></tr>
@@ -90,6 +91,7 @@
 <section id="faq"><h2>FAQ</h2>
   <details><summary>Does the phone need internet?</summary><p>Only once, to load the receiver. After that it starts from its offline cache. The transfer itself never uses a network.</p></details>
   <details><summary>Why do some codes look different?</summary><p>There is no back channel, so the sender cannot ask the camera what it reads best. Smart mode mixes the fastest readable layout with safer ones in a single stream; every frame carries useful data, so a good camera runs near full speed and a weak one still finishes. Symbols have a fixed size, so nothing received is ever wasted.</p></details>
+  <details><summary>Why are some frames in colour?</summary><p>A colour frame holds three codes in one square (one each in red, green and blue), so it carries three times the data. Smart mode mixes them in when the squares are large enough. If your phone cannot read them it loses nothing but a little time: every frame carries fresh data, and the black and white frames alone complete the file. Set Colour to Off in Settings to send without them.</p></details>
   <details><summary>How do I make it faster?</summary><p>Nothing to set: Smart mode adapts to the screen. A larger or wider screen carries more codes at once; fill the camera view with it and avoid glare. Text-like files are compressed first automatically. For lab conditions there are manual Extreme levels (20 and 30 codes per second).</p></details>
   <details><summary>Can I send text or several files?</summary><p>Text: open <i>Send text instead</i> on the sender, or paste. Several files: put them in one zip file first.</p></details>
   <details><summary>It is stuck or slow. What do I check?</summary><p>Fill the camera view with the screen, hold still, and tilt a little to remove glare. Turn the screen brightness up. If only the slower codes get through, move closer. If the phone looked away, just point it back: nothing is lost.</p></details>
@@ -98,5 +100,5 @@
 </section>
 
 <footer><p>QRStream by <a href="https://vyrox.com/" rel="noopener">VYROX</a> · MIT licence · <a href="https://github.com/yeerock/qrstream/blob/main/docs/METHODOLOGY.md">Methodology</a> · <a href="https://github.com/yeerock/qrstream">Source</a></p></footer>
-<script src="core/qrtx.js?v=2.3.1"></script><script src="site.js?v=2.3.1"></script>
+<script src="core/qrtx.js?v=2.4.0"></script><script src="site.js?v=2.4.0"></script>
 </body></html>

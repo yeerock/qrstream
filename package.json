@@ -1,6 +1,6 @@
 {
   "name": "qrstream",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "description": "Send any file from a screen to a phone as a video of QR codes. One way, no network, own QR reader and erasure code, zero dependencies.",
   "license": "MIT",
   "private": true,

@@ -11,13 +11,17 @@
   const P = new URLSearchParams(location.search), TEST = P.has('test');   // test mode: frames advance only when the test asks (deterministic recording)
   const sz = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1000 ? Math.round(n / 1024) + ' KB' : Math.max(0, Math.round(n)) + ' bytes';
   $('rx').textContent = RECEIVER.replace('?go', '');
+  if (/^(auto|off|only)$/.test(P.get('col') || '')) $('col').value = P.get('col');   // ?col=off or ?col=only: colour frames off, or on every frame (tests and trials)
 
   /** One or more codes in a row or a grid (cols per row), one pixel per module, with a 4-module quiet zone around and between them (ISO/IEC 18004 7.3.8). */
-  function draw(cv, qs, quiet = 4, cols = 0) {
-    qs = [].concat(qs); cols = cols || qs.length; const s = qs[0].size, n = s + quiet * 2, W = n * cols, H = n * Math.ceil(qs.length / cols); cv.width = W; cv.height = H;
+  function draw(cv, qs, quiet = 4, cols = 0, colour = false) {
+    // colour: every square holds three codes of one size, one in each of the red, green and blue channels (qs = red, green, blue of square 0, then of square 1, ...).
+    // Their finder, timing and format patterns coincide, so the square still looks like one black and white code to anything that finds codes by brightness.
+    qs = [].concat(qs); const per = colour ? 3 : 1, squares = qs.length / per; cols = cols || squares; const s = qs[0].size, n = s + quiet * 2, W = n * cols, H = n * Math.ceil(squares / cols); cv.width = W; cv.height = H;
     const x = cv.getContext('2d'), im = x.createImageData(W, H), d = new Uint32Array(im.data.buffer);
     d.fill(0xFFFFFFFF);
-    qs.forEach((q, k) => { for (let y = 0; y < q.size; y++) for (let i = 0, o = (y + quiet + Math.floor(k / cols) * n) * W + quiet + (k % cols) * n, r = y * q.size; i < q.size; i++) if (q.m[r + i]) d[o + i] = 0xFF000000; });
+    qs.forEach((q, j) => { const k = Math.floor(j / per), ink = colour ? ~(0xFF << (8 * (j % 3))) : 0xFF000000;   // a pixel is A B G R in this array: clearing one byte darkens one channel
+      for (let y = 0; y < q.size; y++) for (let i = 0, o = (y + quiet + Math.floor(k / cols) * n) * W + quiet + (k % cols) * n, r = y * q.size; i < q.size; i++) if (q.m[r + i]) d[o + i] = colour ? d[o + i] & ink : ink; });
     x.putImageData(im, 0, 0);
   }
   /** Whole device pixels per module keep the code sharp; the canvas holds one pixel per module and CSS scales it. */
@@ -68,7 +72,13 @@
       const A = best(4, Infinity, 2.5) || best(3) || opts[opts.length - 1], B = best(5, A.cap, 3) || A, C = best(7, B.cap, 3.5) || B;
       const tb = B === A ? 1 : 2, tc = C === B ? tb : 3;   // the tier travels in every frame, so the receiver's coach knows which kind it is reading
       plan = [[A, 15, 1], [A, 15, 1], [A, 15, 1], [B, 12, tb], [A, 15, 1], [A, 15, 1], [B, 12, tb], [C, 10, tc]];
+      // Colour tier K: three codes in one square carry three times the data. It needs larger modules than black and white (a camera sees colour less sharply), so it is
+      // the best layout with modules of at least 5 device pixels, used only when it then carries more than A. Colour frames take 3 of the 8 slots; a phone that
+      // cannot read them still finishes on the black and white frames.
+      const colMode = $('col').value, K = colMode === 'off' ? null : best(5, Infinity, 3);
+      if (K && (colMode === 'only' || 3 * K.cap > A.cap)) { const kk = [K, 12, 1, true]; plan = colMode === 'only' ? [kk] : [kk, kk, [A, 15, 1], [B, 12, tb], kk, [A, 15, 1], [B, 12, tb], [C, 10, tc]]; }
     }
+    const capOf = e => e[0].cap * (e[3] ? 3 : 1), hasColour = () => plan.some(e => e[3]);
     /** Codes choices that give no readable layout on this screen at this density are switched off; a chosen one that stops fitting goes back to Auto, with a note. */
     let kNote = '', kNoteUntil = 0;
     function refreshK() {
@@ -80,11 +90,11 @@
     let slot = 0;
     const smart = () => $('lvl').value === 'auto';
     const cur = () => {
-      if (smart()) { const [o, fps, tier] = plan[slot % plan.length]; return { v: o.v, k: o.k, c: o.c, fps, tier }; }
+      if (smart()) { const [o, fps, tier, colour] = plan[slot % plan.length]; return { v: o.v, k: o.k, c: o.c, fps, tier, colour: !!colour }; }
       const [v, fps] = LEVELS[+$('lvl').value];
       // a fixed density: the layout with the most codes whose modules are still at least 3 device pixels
       const g = grids().filter(([c, r]) => modPx(v, c, r) >= 3 && filmable(v, c, r)).sort((a, b) => b[0] * b[1] - a[0] * a[1] || a[1] - b[1])[0] || [1, 1];   // never a layout that cannot be read
-      return { v, k: g[0] * g[1], c: g[0], fps, tier: 0 };
+      return { v, k: g[0] * g[1], c: g[0], fps, tier: 0, colour: $('col').value === 'only' };
     };
     const shape = (k, c) => k === c ? `${k}\u00d7` : `${c} by ${k / c} grid of`;
     const clock = t => { t = Math.floor(t / 1000); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
@@ -92,20 +102,20 @@
       const { v, k, fps } = cur(); let rate;
       // bytes per second when every code is read: the slots of the weave last 1/15, 1/12 and 1/10 s, so it is bytes of one round over the time of one round
       const round = plan.reduce((a, [, f]) => a + 1 / f, 0);
-      if (smart()) rate = plan.reduce((a, [o]) => a + o.cap, 0) / round; else rate = k * QRTX.symbolsIn(v) * QRTX.SYMBOL * fps;
-      const head = smart() ? `Smart: ${shape(plan[0][0].k, plan[0][0].c)} v${plan[0][0].v}, about ${Math.round(plan.length / round)} screens a second, with safer frames woven in` : `${shape(k, cur().c)} QR v${v} \u00b7 ${fps}/s`, pass = syms / need, secs = Math.max(1, Math.ceil(data.length * 1.02 / rate));
+      if (smart()) rate = plan.reduce((a, e) => a + capOf(e), 0) / round; else rate = k * QRTX.symbolsIn(v) * QRTX.SYMBOL * fps * (cur().colour ? 3 : 1);
+      const head = smart() ? `Smart: ${shape(plan[0][0].k, plan[0][0].c)} v${plan[0][0].v}, about ${Math.round(plan.length / round)} screens a second, ${plan.length === 1 ? 'every frame in colour' : `with ${hasColour() ? 'colour frames and ' : ''}safer frames woven in`}` : `${shape(k, cur().c)} QR v${v} \u00b7 ${fps}/s`, pass = syms / need, secs = Math.max(1, Math.ceil(data.length * 1.02 / rate));
       const set = (id, t) => { const e = $(id); if (e.textContent !== t) e.textContent = t; };
       set('fstat', paused ? (frames ? 'Paused' : "Ready. Scan this code with the phone's camera to open the receiver, then press Start stream.") : entryOn ? "Scan this code with the phone's camera to open the receiver. The file starts in a moment." : `Showing for ${clock(shownMs)}${pass >= 2 ? ` \u00b7 shown ${Math.floor(pass)} times over` : ''} \u00b7 a phone needs about ${secs} s of clear view`);
       set('fdet', performance.now() < kNoteUntil ? kNote : `${sz(file.size)}${zipped ? ' (gzip ' + sz(data.length) + ')' : ''} \u00b7 ${head} \u00b7 up to ${sz(rate)}/s`);
       $('fdet').title = $('fdet').textContent;
       $('play').classList.toggle('enough', pass >= 1);
     };
-    $('lvl').onchange = $('k').onchange = () => { refreshK(); makePlan(); stat(); };
+    $('lvl').onchange = $('k').onchange = $('col').onchange = () => { refreshK(); makePlan(); stat(); };
     let entryOn = true;   // the entry code is on the stage (the first 2.5 s, and for 5 s after a click on the corner code)
     const step = (forceEntry) => {
       entryOn = !!forceEntry;
       if (forceEntry) { if (cv.width !== entry.size + 8) draw(cv, entry); }
-      else { const { v, k, c, tier } = cur(), qs = []; for (let i = 0; i < k; i++) qs.push(QRTX.encode(s.next(v, tier), { version: v, mask: 2 })); draw(cv, qs, 4, c); frames++; slot++; syms += k * QRTX.symbolsIn(v); }
+      else { const { v, k, c, tier, colour } = cur(), qs = [], per = colour ? 3 : 1; for (let i = 0; i < k * per; i++) qs.push(QRTX.encode(s.next(v, tier), { version: v, mask: 2 })); draw(cv, qs, 4, c, colour); frames++; slot++; syms += k * per * QRTX.symbolsIn(v); }
       fit(cv); stat();
     };
     const tick = t => { timer = requestAnimationFrame(tick); if (paused) { last = t; return; } const dt = t - last; if (dt < 1000 / cur().fps - 2) return; if (last) shownMs += Math.min(dt, 500); last = t; step(t < bigUntil); };
@@ -115,7 +125,7 @@
     refreshK(); makePlan();   // measured on the visible stage
     draw($('ecode'), entry); { const e = $('ecode'), m = Math.max(1, Math.floor(96 * dpr() / e.width)); e.style.width = e.style.height = (m * e.width / dpr()) + 'px'; }   // whole device pixels per module, like the stage
     draw(cv, entry); fit(cv); setPause(still); $('pause').focus();
-    if (TEST) { window.__qrsStep = n => { for (let i = 0; i < n; i++) step(); return frames; }; window.__qrsEntry = () => step(true); window.__qrsMeta = meta; window.__qrsGrab = () => { const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let b = ''; for (let i = 0; i < d.length; i += 4) b += d[i] < 128 ? '1' : '0'; return { w: cv.width, h: cv.height, b }; }; }
+    if (TEST) { window.__qrsStep = n => { for (let i = 0; i < n; i++) step(); return frames; }; window.__qrsEntry = () => step(true); window.__qrsMeta = meta; window.__qrsGrab = () => { const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let b = '', c = '', col = false; for (let i = 0; i < d.length; i += 4) { const r = d[i] < 128, g = d[i + 1] < 128, bl = d[i + 2] < 128; b += r ? '1' : '0'; c += (r ? 1 : 0) | (g ? 2 : 0) | (bl ? 4 : 0); if (r !== g || g !== bl) col = true; } return col ? { w: cv.width, h: cv.height, b, c } : { w: cv.width, h: cv.height, b }; }; }   // c: which channels are dark at each pixel, when the screen is a colour frame
     else { const t0 = setTimeout(() => { timer = requestAnimationFrame(tick); }, still ? 0 : 2500); var early = () => clearTimeout(t0); }   // entry code first, so the phone can open the receiver
     try { if (navigator.wakeLock) wl = await navigator.wakeLock.request('screen'); } catch (e) { }
     // the stage changes size when the window does, when Settings opens on a phone, and when the bar's text wraps: plan again each time, so modules never fall under the planned size

@@ -3,7 +3,7 @@
 // (Start Camera -> worker pool -> own QR reader -> erasure decoder) rebuilds the file, which must match the SHA-256.
 // Run: npm run e2e      The last line is "E2E PASS: ..." (exit code 0) or "E2E FAIL: ..." (exit code 1).
 // Options: FILE=path  DEMO=picture|text  FRAMES=n  K=1|2|3 (codes per screen)  LVL=0..4  CAM=1280x720  FPS=10 (screens per second on the camera)
-//          EXPECT_TYPE=mime  BASE=https://... (test a deployed copy)  RX=https://... (receiver from another copy)  KEEP=1 (keep receiver screenshots for the demo video)
+//          COLOUR=off|only (colour frames)  EXPECT_TYPE=mime  BASE=https://... (test a deployed copy)  RX=https://... (receiver from another copy)  KEEP=1 (keep receiver screenshots for the demo video)
 //          TIMEOUT=ms (receiver, default 180000)  PORT=n (local server; default: any free port, so runs at the same time never meet)
 import fs from 'node:fs'; import path from 'node:path';
 import { serve } from './serve.mjs'; import { launch, launchCamera, retryFrozenCamera } from './cdp.mjs'; import { shoot, writeY4M, feedFile } from './camera.mjs';
@@ -16,7 +16,7 @@ try {
   srv = E.BASE ? null : await serve(+E.PORT || 0); const base = E.BASE || `http://127.0.0.1:${srv.port}`;
   // 1. sender: draw the stream and grab every screen as modules
   b1 = await launch();
-  const sp = await b1.page(`${base}/send/?test${FILE ? '' : '&demo=' + DEMO}`, { width: CW, height: CH });
+  const sp = await b1.page(`${base}/send/?test${FILE ? '' : '&demo=' + DEMO}${E.COLOUR ? '&col=' + E.COLOUR : ''}`, { width: CW, height: CH });
   if (FILE) { await sp.eval(`(() => { const k = ${JSON.stringify(E.K || '')}, l = ${JSON.stringify(E.LVL || '')}; if (k) document.getElementById('k').value = k; if (l) document.getElementById('lvl').value = l; })()`); await sp.setFiles('#file', [FILE]); }
   try { await sp.waitFor('window.__qrsStep && 1'); } catch (e) { throw new Error(`the sender did not start its stream: ${await sp.eval("document.getElementById('err').textContent").catch(() => '')} ${sp.logs.slice(-3).join(' | ')}`); }
   if (E.DEBUG) console.log('sender ready');

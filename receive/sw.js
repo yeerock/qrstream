@@ -1,5 +1,5 @@
 // Offline: once opened, the receiver starts from this cache, so it works where there is no signal. New versions arrive when there is a network.
-const C = 'qrstream-8', FILES = ['./', 'app.css', 'app.js', '../core/qrtx.js', '../core/qrread.js', 'preview.js', 'worker.js', 'manifest.webmanifest', '../icon.svg', '../guard.js'], KNOWN = new Set(FILES.map(f => new URL(f, location.href).pathname));
+const C = 'qrstream-9', FILES = ['./', 'app.css', 'app.js', '../core/qrtx.js', '../core/qrread.js', 'preview.js', 'worker.js', 'manifest.webmanifest', '../icon.svg', '../guard.js'], KNOWN = new Set(FILES.map(f => new URL(f, location.href).pathname));
 self.addEventListener('install', e => e.waitUntil(caches.open(C).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== C).map(x => caches.delete(x)))).then(() => self.clients.claim())));
 // network first with a short wait, so a weak signal does not hold the page up; only this app's own files are cached, one entry each

@@ -140,5 +140,5 @@ Tests (`tests/reader.test.mjs`) draw our own encoder's codes through a projectiv
 ## 10. Limits and roadmap
 
 * Not yet measured with physical cameras across phone models. The numbers above come from the camera simulator, which models tilt, blur, noise and light but not rolling shutter or screen flicker. Field results will be added.
-* Colour codes (three channels) could triple density again, but they need a custom decoder robust to camera white balance.
+* Colour frames (three codes in the red, green and blue channels of one square; README, "Colour frames") are built and measured with the simulated camera only: 400 KB on a Full HD sender in 6.2 s without, 4.1 s woven, 2.9 s on every frame. The reader learns and undoes the channel mixing per tile. A test on physical phones is still owed.
 * Smart mode could become closed-loop with an optional optical back channel (the phone's screen filmed by the sender's webcam) could stop the stream early and pick the density adaptively.

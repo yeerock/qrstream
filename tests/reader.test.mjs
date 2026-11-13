@@ -105,4 +105,28 @@ t('speed: v40 at 1280x720, 3 codes', () => {
   const ts = [frame(40), frame(40), frame(40)], pic = picture(1280, 720, ts.map((x, i) => ({ q: Q.encode(x, { version: 40, mask: 2 }), x: 30 + i * 410, y: 120, s: 2.2 })), {});
   const t0 = performance.now(); const r = R.read(pic); const ms = performance.now() - t0; console.log(`   ${r.length} codes in ${ms.toFixed(0)} ms`); assert.equal(r.length, 3);
 });
+// ---- colour frames: three codes in the red, green and blue channels of the same squares, through a colour camera
+/** Three module sheets (one per channel) through the same geometry, then what a camera does to colour: each channel sees part of the other two (mix),
+    a colour cast, noise of its own per channel, and colour kept at half resolution (4:2:0) while brightness stays full. */
+function colourPicture(W, H, layers, opt, mix) {
+  const ch = layers.map(codes => picture(W, H, codes, opt).data), out = new Uint8ClampedArray(W * H * 4), P = [new Float32Array(W * H), new Float32Array(W * H), new Float32Array(W * H)];
+  const MX = [[1 - 1.6 * mix, 1.2 * mix, 0.4 * mix], [0.9 * mix, 1 - 1.7 * mix, 0.8 * mix], [0.3 * mix, 1.4 * mix, 1 - 1.7 * mix]], cast = [0.85, 1, 1.12]; let q = 5; const rn = () => (q = (Math.imul(q, 1103515245) + 12345) >>> 0) / 4294967296 - 0.5;
+  for (let i = 0; i < W * H; i++) { const v = [ch[0][i * 4], ch[1][i * 4], ch[2][i * 4]]; for (let c = 0; c < 3; c++) P[c][i] = cast[c] * (v[0] * MX[c][0] + v[1] * MX[c][1] + v[2] * MX[c][2]) + rn() * 20; }
+  const U = new Float32Array(W * H), V = new Float32Array(W * H), Y = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) { Y[i] = 0.299 * P[0][i] + 0.587 * P[1][i] + 0.114 * P[2][i]; U[i] = (P[2][i] - Y[i]) * 0.564; V[i] = (P[0][i] - Y[i]) * 0.713; }
+  for (let y = 0; y < H - 1; y += 2) for (let x = 0; x < W - 1; x += 2) { const a = y * W + x, ids = [a, a + 1, a + W, a + W + 1], u = ids.reduce((t, k) => t + U[k], 0) / 4, v = ids.reduce((t, k) => t + V[k], 0) / 4; for (const k of ids) { U[k] = u; V[k] = v; } }
+  for (let i = 0; i < W * H; i++) { out[i * 4] = Y[i] + 1.403 * V[i]; out[i * 4 + 1] = Y[i] - 0.344 * U[i] - 0.714 * V[i]; out[i * 4 + 2] = Y[i] + 1.773 * U[i]; out[i * 4 + 3] = 255; }
+  return { data: out, width: W, height: H };
+}
+for (const [name, v, c, r, s, mix] of [['colour: one v40 square, 4 px modules', 40, 1, 1, 4, 0.15], ['colour: 2 by 2 grid of v25, 3.4 px, strong mixing', 25, 2, 2, 3.4, 0.25], ['colour: two rows of four v22 (24 codes in one picture), 4 px', 22, 4, 2, 4, 0.15]]) t(name, () => {
+  const n = v * 4 + 25, W = Math.ceil(c * n * s + 200) & ~1, H = Math.ceil(r * n * s + 160) & ~1, texts = [0, 1, 2].map(() => Array.from({ length: c * r }, () => frame(v)));
+  const place = ts => ts.map((x, i) => ({ q: Q.encode(x, { version: v, mask: 2 }), x: 100 + (i % c) * n * s, y: 80 + Math.floor(i / c) * n * s, s }));
+  const got = new Set(R.read(colourPicture(W, H, texts.map(place), { rot: 0.02, persp: 0.04, blur: 1, noise: 18, light: 0.25 }, mix), 9));
+  for (const x of texts.flat()) assert.ok(got.has(x), 'a code of the colour frame was not read'); assert.equal(got.size, 3 * c * r);
+});
+t('colour off: a colour frame gives nothing, and a black and white frame is still one text through the colour camera', () => {
+  const v = 25, n = v * 4 + 25, s = 4, W = (n * s + 200) & ~1, a = frame(v), b = frame(v), c = frame(v), at = x => [{ q: Q.encode(x, { version: v, mask: 2 }), x: 100, y: 80, s }];
+  assert.deepEqual(R.read(colourPicture(W, W, [at(a), at(b), at(c)], { blur: 1, noise: 18 }, 0.15), 5, { colour: false }), []);
+  assert.deepEqual(R.read(colourPicture(W, W, [at(a), at(a), at(a)], { blur: 1, noise: 18 }, 0.15)), [a]);
+});
 console.log(`${pass} passed, ${fail} failed`); if (fail) process.exitCode = 1;

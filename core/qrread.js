@@ -17,9 +17,11 @@
 
   // ---- 1. binarize
   const GREY = new WeakMap();   // binary picture -> its grey picture and block thresholds, for the grey sampler (step 4)
-  function binarize(rgba, W, H) {
+  /** ch: undefined = brightness (black and white codes); 0, 1 or 2 = the red, green or blue channel alone (one of the three codes of a colour frame). */
+  function binarize(rgba, W, H, ch) {
     const g = new Uint8Array(W * H);
-    for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (rgba[j] * 77 + rgba[j + 1] * 150 + rgba[j + 2] * 29) >> 8;
+    if (ch === undefined) for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (rgba[j] * 77 + rgba[j + 1] * 150 + rgba[j + 2] * 29) >> 8;
+    else for (let i = 0, j = ch; i < g.length; i++, j += 4) g[i] = rgba[j];
     const B = 8, bw = Math.ceil(W / B), bh = Math.ceil(H / B), avg = new Float32Array(bw * bh), wt = new Float32Array(bw * bh);
     for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
       let mn = 255, mx = 0, sum = 0, n = 0, sat = 0;
@@ -246,6 +248,77 @@
     }
     return out;
   }
+  /** Colour frame: three module matrices, one per channel, from the colour picture.
+      A camera does not see a screen's red, green and blue apart: each of its channels also picks up some of the other two, and white balance and
+      exposure scale them, differently across the picture. So the modules are not thresholded channel by channel. In each tile of about 32 by 32
+      modules the mixing is learned from the modules themselves and undone:
+        seen colour = dark level + MIX x (which of the three codes are light here)       (3 numbers per module, MIX is 3 by 3)
+      A first guess of the bits (each channel against its own mid level) gives a least-squares fit of the dark level and MIX; inverting MIX gives better
+      bits; three rounds settle it. A one-module sharpening step then undoes most of the blur, as in the grey sampler. K = sharpening strength. */
+  function sampleColour(rgba, W, H, dim, L, cells, K = 1) {
+    const at = centres(dim, L, cells), N = dim * dim, obs = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
+    for (let y = 0; y < dim; y++) for (let x = 0; x < dim; x++) {
+      const [px, py] = at(x, y), i = y * dim + x;
+      if (!(px >= 0 && py >= 0 && px <= W - 1 && py <= H - 1)) { obs[0][i] = obs[1][i] = obs[2][i] = 255; continue; }
+      const x0 = Math.min(W - 2, px | 0), y0 = Math.min(H - 2, py | 0), fx = px - x0, fy = py - y0, o = (y0 * W + x0) * 4, a = (1 - fx) * (1 - fy), b = fx * (1 - fy), c = (1 - fx) * fy, d = fx * fy;
+      for (let k = 0; k < 3; k++) obs[k][i] = rgba[o + k] * a + rgba[o + 4 + k] * b + rgba[o + W * 4 + k] * c + rgba[o + W * 4 + 4 + k] * d;
+    }
+    const lit = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];   // how light each code is at each module: 0 dark .. 1 light, after unmixing
+    const nt = Math.max(1, Math.round(dim / 32)), ts = dim / nt;
+    for (let ty = 0; ty < nt; ty++) for (let tx = 0; tx < nt; tx++) {
+      const x0 = Math.round(tx * ts), x1 = Math.round((tx + 1) * ts), y0 = Math.round(ty * ts), y1 = Math.round((ty + 1) * ts), idx = [];
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) idx.push(y * dim + x);
+      const n = idx.length, X = [new Float32Array(n), new Float32Array(n), new Float32Array(n)], lo = [0, 0, 0], span = [1, 1, 1];
+      for (let k = 0; k < 3; k++) { let mn = 255, mx = 0; for (const i of idx) { const v = obs[k][i]; if (v < mn) mn = v; if (v > mx) mx = v; } lo[k] = mn; span[k] = Math.max(1, mx - mn); }
+      // The fit needs a first guess of the bits, and with strong mixing "each channel against its own mid level" gives the same guess three times (all three
+      // follow the brightness), from which the fit cannot recover. So several guesses are tried, each assuming a different amount of even mixing m
+      // (with each channel scaled to 0..1: seen_c = (1 - 3m) x_c + m (x_r + x_g + x_b)), and the fit with the smallest error is kept.
+      let best = null;
+      for (const m0 of [0, 0.12, 0.22, 0.3]) {
+        for (let j = 0; j < n; j++) { const i = idx[j], o0 = (obs[0][i] - lo[0]) / span[0], o1 = (obs[1][i] - lo[1]) / span[1], o2 = (obs[2][i] - lo[2]) / span[2], sum = o0 + o1 + o2; X[0][j] = (o0 - m0 * sum) / (1 - 3 * m0) > 0.5 ? 1 : 0; X[1][j] = (o1 - m0 * sum) / (1 - 3 * m0) > 0.5 ? 1 : 0; X[2][j] = (o2 - m0 * sum) / (1 - 3 * m0) > 0.5 ? 1 : 0; }
+        let inv = null, base = null, M = null;
+        for (let round = 0; round < 3; round++) {
+          // normal equations of obs_c = base_c + sum_k MIX[c][k] * X_k over the tile (the same 4 by 4 matrix for the three channels)
+          const A = new Float64Array(16), Bv = [new Float64Array(4), new Float64Array(4), new Float64Array(4)];
+          for (let j = 0; j < n; j++) { const f = [1, X[0][j], X[1][j], X[2][j]]; for (let p = 0; p < 4; p++) { for (let q = 0; q < 4; q++) A[p * 4 + q] += f[p] * f[q]; for (let c = 0; c < 3; c++) Bv[c][p] += f[p] * obs[c][idx[j]]; } }
+          const sol = Bv.map(bv => solve4(A, bv)); if (sol.some(v => !v)) { inv = null; break; }
+          M = [sol[0][1], sol[0][2], sol[0][3], sol[1][1], sol[1][2], sol[1][3], sol[2][1], sol[2][2], sol[2][3]];
+          const det = M[0] * (M[4] * M[8] - M[5] * M[7]) - M[1] * (M[3] * M[8] - M[5] * M[6]) + M[2] * (M[3] * M[7] - M[4] * M[6]); if (Math.abs(det) < 1) { inv = null; break; }   // a tile of one colour cannot say
+          inv = adj(M).map(v => v / det); base = [sol[0][0], sol[1][0], sol[2][0]];
+          for (let j = 0; j < n; j++) { const i = idx[j], r = obs[0][i] - base[0], g = obs[1][i] - base[1], bb = obs[2][i] - base[2]; for (let k = 0; k < 3; k++) X[k][j] = inv[k * 3] * r + inv[k * 3 + 1] * g + inv[k * 3 + 2] * bb > 0.5 ? 1 : 0; }
+        }
+        if (!inv) continue;
+        // error of this fit: how far the seen colours are from the eight colours the fit predicts; each code's own channel must also come out on top
+        // (a fit that swapped two codes, or folded two into one, explains the colours almost as well but returns the wrong data)
+        if (!(M[0] > M[1] && M[0] > M[2] && M[4] > M[3] && M[4] > M[5] && M[8] > M[6] && M[8] > M[7])) continue;
+        let err = 0; for (let j = 0; j < n; j++) { const i = idx[j]; for (let c = 0; c < 3; c++) { const e = obs[c][i] - base[c] - M[c * 3] * X[0][j] - M[c * 3 + 1] * X[1][j] - M[c * 3 + 2] * X[2][j]; err += e * e; } }
+        if (!best || err < best.err) best = { err, inv, base };
+      }
+      const inv = best && best.inv;
+      if (inv) for (let j = 0; j < n; j++) { const i = idx[j], r = obs[0][i] - best.base[0], g = obs[1][i] - best.base[1], bb = obs[2][i] - best.base[2]; for (let k = 0; k < 3; k++) lit[k][i] = inv[k * 3] * r + inv[k * 3 + 1] * g + inv[k * 3 + 2] * bb; }
+      else for (let k = 0; k < 3; k++) for (let j = 0; j < n; j++) X[k][j] = (obs[k][idx[j]] - lo[k]) / span[k] > 0.5 ? 1 : 0;
+      if (!inv) for (let k = 0; k < 3; k++) for (let j = 0; j < n; j++) lit[k][idx[j]] = X[k][j];   // no fit: the first guess stands
+    }
+    return lit.map(v => {
+      const out = new Uint8Array(N);
+      for (let y = 0; y < dim; y++) for (let x = 0; x < dim; x++) {
+        const i = y * dim + x; let sm = 0, n = 0;
+        if (x > 0) { sm += v[i - 1]; n++; } if (x < dim - 1) { sm += v[i + 1]; n++; } if (y > 0) { sm += v[i - dim]; n++; } if (y < dim - 1) { sm += v[i + dim]; n++; }
+        out[i] = v[i] + K * (v[i] - sm / n) <= 0.5 ? 1 : 0;
+      }
+      return out;
+    });
+  }
+  /** 4 by 4 linear system by Gauss elimination with pivoting; null when it has no single answer. */
+  function solve4(A, b) {
+    const m = Array.from({ length: 4 }, (_, i) => [A[i * 4], A[i * 4 + 1], A[i * 4 + 2], A[i * 4 + 3], b[i]]);
+    for (let c = 0; c < 4; c++) {
+      let p = c; for (let r = c + 1; r < 4; r++) if (Math.abs(m[r][c]) > Math.abs(m[p][c])) p = r;
+      if (Math.abs(m[p][c]) < 1e-9) return null; [m[c], m[p]] = [m[p], m[c]];
+      for (let r = 0; r < 4; r++) if (r !== c) { const f = m[r][c] / m[c][c]; for (let k = c; k < 5; k++) m[r][k] -= f * m[c][k]; }
+    }
+    return m.map((r, i) => r[4] / r[i]);
+  }
   /** Kept for tests and tools: sampler(mode 0 = full lock, one map; 1 = full lock, cell maps). */
   const sampler = (bin, W, H, t, dim, mode) => sample(bin, W, H, dim, lock(bin, W, H, t, dim, true), mode === 1);
 
@@ -374,18 +447,21 @@
     out.agree = a > 0 && a === b; return out;
   }
   /** ImageData-like {data, width, height} -> array of decoded texts (up to `max` codes). */
-  function read(img, max = 5) {
-    const W = img.width, H = img.height, bin = binarize(img.data, W, H), fs = finders(bin, W, H);
+  /** Colour frames: three codes of one version drawn in the red, green and blue channels of the same squares. Their finder, timing, alignment, format and
+      version patterns coincide, so in brightness they look like one code whose data does not decode; the triangle and its size are found as usual and the
+      data is then read from the colour picture with the channel mixing undone (sampleColour). A colour frame gives up to three texts. opts.colour = false switches this off. */
+  function read(img, max = 5, opts = {}) {
+    const W = img.width, H = img.height, lum = binarize(img.data, W, H), fs = finders(lum, W, H);
     if (fs.length < 3) return [];
     const fs2 = fs.length > 40 ? fs.sort((a, b) => b.n - a.n).slice(0, 40) : fs;   // bound the triangle search
-    const out = [], used = new Set(); let tries = 0;
+    const out = [], used = new Set(); let tries = 0, codes = 0;   // codes: squares decoded (a colour frame gives up to three texts for one square)
     for (const t of triples(fs2)) {
-      if (out.length >= max || tries >= 4 * max + 8) break;
+      if (codes >= max || tries >= 4 * max + 8) break;
       if (used.has(t.tl) || used.has(t.tr) || used.has(t.bl)) continue;   // a finder belongs to one code; marked only after a decode succeeds
       tries++;
       const side = (dist(t.tl, t.tr) + dist(t.tl, t.bl)) / 2 / t.ms;
       let dim = Math.round(side) + 7; const r = dim & 3; dim += r === 0 ? 1 : r === 2 ? -1 : r === 3 ? -2 : 0;
-      const tried = new Set(); let text = null;
+      let tried = new Set(), bin = lum, text = null;   // bin: the picture the modules are read from (brightness, or one colour channel)
       const tryDim = (d, proven) => {
         if (d < 21 || d > 177 || tried.has(d)) return null; tried.add(d);
         // fast lock first: modules from the binary picture, then from the grey picture (small modules under blur)
@@ -409,13 +485,28 @@
       };
       // timing patterns (row 6 and column 6 alternate dark/light between the finders) prove the triangle is a code and pick its size, for a few
       // hundred samples instead of a full decode attempt per guess
-      const sizes = timingDims(bin, W, H, t);
+      const sizes = timingDims(lum, W, H, t);
       for (const d of sizes) { text = tryDim(d, sizes.agree); if (text !== null) break; }
       if (text === null) {   // second opinion from the grey picture (small modules), then, for a clean triangle, the geometric size once
-        const more = timingDims(bin, W, H, t, true), sure = more.agree && !tried.has(more[0]); if (!sizes.length && !more.length && t.err < 0.05) more.push(dim);
+        const more = timingDims(lum, W, H, t, true), sure = more.agree && !tried.has(more[0]); if (!sizes.length && !more.length && t.err < 0.05) more.push(dim);
         for (const d of more) { text = tryDim(d, sure); if (text !== null) break; }
       }
-      if (text !== null) { out.push(text); used.add(t.tl); used.add(t.tr); used.add(t.bl); }
+      if (text === null && opts.colour !== false && (sizes.agree || sizes.length === 1)) {   // a code by its timing lines, yet no data in brightness: a colour frame?
+        const got = [null, null, null];
+        for (const d of sizes) {
+          for (const full of [false, true]) {
+            if (full && !got.some(Boolean) && d < 25) break;
+            const L = lock(lum, W, H, t, d, full), Ms = sampleColour(img.data, W, H, d, L, full);
+            for (let c = 0; c < 3; c++) if (got[c] === null) got[c] = decodeMatrix(Ms[c], d);
+            if (got.every(x => x !== null)) break;
+          }
+          if (got.some(x => x !== null)) break;
+        }
+        const texts = got.filter(x => x !== null);
+        if (texts.length) { for (const x of texts) out.push(x); codes++; used.add(t.tl); used.add(t.tr); used.add(t.bl); }
+        continue;
+      }
+      if (text !== null) { out.push(text); codes++; used.add(t.tl); used.add(t.tr); used.add(t.bl); }
     }
     return out;
   }
