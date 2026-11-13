@@ -43,7 +43,7 @@
     const data = QRTX.pack(meta, body), s = new QRTX.Stream(data, crypto.getRandomValues(new Uint32Array(1))[0]);
     const entry = QRTX.encode(RECEIVER), cv = $('qr');
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches && !TEST;   // people who asked for less motion start the flicker themselves
-    let paused = still, timer = 0, last = 0, frames = 0, syms = 0, shownMs = 0, wl = null; const need = Math.ceil(data.length / QRTX.SYMBOL);
+    let bigUntil = 0; let paused = still, timer = 0, last = 0, frames = 0, syms = 0, shownMs = 0, wl = null; const need = Math.ceil(data.length / QRTX.SYMBOL);
     // ---- Smart mode (Density Auto): no back channel, so the stream optimises itself.
     // 1. From this screen's real device pixels, find the layouts (QR version x codes side by side) whose modules are big enough to film.
     // 2. Weave three tiers into one stream, A A A B A A B C: A = the fastest comfortable layout, B = one step safer, C = a safe layout.
@@ -91,7 +91,7 @@
       else { const { v, k, c } = cur(), qs = []; for (let i = 0; i < k; i++) qs.push(QRTX.encode(s.next(v), { version: v, mask: 2 })); draw(cv, qs, 4, c); frames++; slot++; syms += k * QRTX.symbolsIn(v); }
       fit(cv); stat();
     };
-    const tick = t => { timer = requestAnimationFrame(tick); if (paused) { last = t; return; } const dt = t - last; if (dt < 1000 / cur().fps - 2) return; if (last) shownMs += Math.min(dt, 500); last = t; step(); };
+    const tick = t => { timer = requestAnimationFrame(tick); if (paused) { last = t; return; } const dt = t - last; if (dt < 1000 / cur().fps - 2) return; if (last) shownMs += Math.min(dt, 500); last = t; step(t < bigUntil); };
     const setPause = p => { paused = p; $('pause').textContent = p ? (frames ? 'Resume' : 'Start stream') : 'Pause'; $('ssay').textContent = p ? 'Paused' : 'Stream playing'; stat(); };
     $('fname').textContent = file.name; $('pickview').hidden = true; $('play').hidden = false; $('opts').open = innerWidth > 600; makePlan();   // measured on the visible stage
     draw($('ecode'), entry); draw(cv, entry); fit(cv); setPause(still); $('pause').focus();
@@ -102,6 +102,9 @@
     const onShow = async () => { if (!document.hidden && navigator.wakeLock) { try { wl = await navigator.wakeLock.request('screen'); } catch (e) { } } }; document.addEventListener('visibilitychange', onShow);   // the lock is lost when the tab is hidden
     stop = () => { cancelAnimationFrame(timer); if (early) early(); removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', onShow); $('ssay').textContent = 'Stopped'; if (wl) wl.release().catch(() => { }); if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); $('play').hidden = true; $('pickview').hidden = false; stop = null; $('drop').focus(); };
     $('pause').onclick = () => setPause(!paused);
+    // a phone that arrives late and cannot scan the small corner code: show it large for 5 seconds
+    $('join').onclick = () => { bigUntil = performance.now() + 5000; if (paused || TEST) { draw(cv, entry); fit(cv); } };
+    $('join').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); $('join').click(); } };
   }
   $('close').onclick = () => stop && stop();
   $('fs').onclick = () => { const p = $('play'); (document.fullscreenElement ? document.exitFullscreen() : p.requestFullscreen?.())?.catch?.(() => { }); };

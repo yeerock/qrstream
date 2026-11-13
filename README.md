@@ -108,7 +108,7 @@ There is no back channel, so the sender cannot ask the phone what it reads best.
 3. **It weaves them into one stream**, `A A A B A A B C`, at 15, 12 and 10 codes a second.
 4. Because every frame carries fresh erasure-coded data, **nothing is wasted**. A good camera reads everything and runs near A's speed; a weak camera reads only B and C and still finishes. There's no probing and no waiting.
 5. **The phone coaches only when needed.** It knows which frame sizes it decodes. If only the safe tier gets through, it asks the user to move closer or hold steady. If it sees nothing, it suggests reducing glare.
-6. **Entry is automatic.** The link code fills the stage for the first 2.5 s and then stays in a corner of the sender bar, so a phone can join at any moment and the stream loses no time to it. The phone's camera app opens the receiver, which starts its own camera. On Android and computers, common pictures, video, audio, PDF and text files save at once; any other type waits for a tap, and iPhone always needs one tap (Apple's rule for downloads).
+6. **Entry is automatic.** The link code fills the stage for the first 2.5 s and then stays in a corner of the sender bar (click it to show it large for 5 s), so a phone can join at any moment and the stream loses no time to it. The phone's camera app opens the receiver, which starts its own camera. On Android and computers, common pictures, video, audio, PDF and text files save at once; any other type waits for a tap, and iPhone always needs one tap (Apple's rule for downloads).
 7. **Both sides show what is happening.** The sender shows the time shown, the pass number, the time a phone needs, the top speed and a check code; it turns green once a phone that saw everything has enough. The receiver shows percent, bytes, live KB/s and time left, and the final speed on the result.
 
 Examples measured by the sender itself:
@@ -258,7 +258,7 @@ A packed transfer is `[u16 JSON length][JSON {name, mime, sha256, size, z?, titl
 | Data leaves the device | No server. Strict CSP: `default-src 'self'`, `connect-src 'self'`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`, no referrer. |
 | Hostile streams that never complete | The decoder holds at most one row per block and does one reduction per symbol: 60,000 crafted symbols on a forged 16 MB stream cost 18 MB and 0.1 ms each in the test. |
 | Forged or corrupted frames | Magic, version and CRC-32 checks. A length under 3 bytes or over 16 MB is ignored. Malformed metadata is rejected. |
-| Another stream in view | The receiver switches streams only after 3 codes in a row from the new one, so a stray code cannot wipe a transfer. |
+| Another stream in view | The receiver switches streams only after 3 different frames of the new one, over at least 0.4 s, with none of the current stream in between, so a stray screen cannot wipe a transfer. |
 | Wrong file shown by a hostile screen | SHA-256 proves error-free delivery, not origin. Both screens show an 8-character check code to compare. |
 | Unwanted downloads | Only common picture, video, audio, PDF and text types save by themselves; other types wait for a tap. |
 | Misleading names | Control and direction-override characters are removed from the title and name. |
@@ -307,6 +307,7 @@ No packages to install: Node 22+ and Google Chrome.
 
 ```bash
 npm test             # codec (Base45, CRC, decoding under 0-50 % loss) + reader (blur, tilt, perspective, noise, 3 codes, damage)
+npm run ui           # the pages in a real browser: sender controls, text sending, reduced motion, framing, a second stream in view
 npm run e2e          # sender -> simulated camera (.y4m fake webcam) -> receiver; SHA-256 must match
 FILE=tests/fixtures/hostile.html EXPECT_TYPE=text/plain npm run e2e   # a hostile HTML file arrives inert
 FILE=some.bin K=3 LVL=0 FPS=30 npm run e2e                            # 3 codes, Extreme+, 30 screens/s

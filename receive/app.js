@@ -57,9 +57,10 @@
     const f = QRTX.parseFrame(text); if (!f || f.len < 3 || f.len > MAX_LEN) return;   // a forged header must not make this page allocate gigabytes
     lastRead = Date.now(); reads++; seenN.push([lastRead, f.n]); if (f.n > topN) topN = f.n;
     if (col && (col.id !== f.id || col.len !== f.len)) {
-      // another stream in view: one stray code must not wipe what was read. Switch only after 3 codes in a row from the new stream.
-      if (other && other.id === f.id && other.len === f.len) other.n++; else other = { id: f.id, len: f.len, n: 1 };
-      if (other.n < 3) return;
+      // another stream in view: a stray screen must not wipe what was read. Switch only when 3 different frames of the new stream arrive,
+      // over at least 0.4 s, with no frame of the current stream in between (the same frame read again by another worker does not count).
+      if (!other || other.id !== f.id || other.len !== f.len) other = { id: f.id, len: f.len, n: 1, last: f.seed, t0: Date.now() }; else if (f.seed !== other.last) { other.n++; other.last = f.seed; }
+      if (other.n < 3 || Date.now() - other.t0 < 400) return;
       if (col.progress > 0.05) say('A different file started on the screen. Starting again.', 4000);
       col = null;
     }

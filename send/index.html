@@ -16,7 +16,7 @@
 <div id="play" hidden role="dialog" aria-modal="true" aria-label="Sending">
   <div id="stage"><canvas id="qr" role="img" aria-label="Animated QR codes carrying the file"></canvas></div>
   <div id="bar">
-    <figure id="join"><canvas id="ecode" role="img" aria-label="QR code that opens the receiver"></canvas><figcaption>Scan to open the receiver</figcaption></figure>
+    <figure id="join" role="button" tabindex="0" aria-label="Show the code that opens the receiver, large, for 5 seconds"><canvas id="ecode" role="img" aria-label="QR code that opens the receiver"></canvas><figcaption>Scan to open the receiver. Click to enlarge.</figcaption></figure>
     <div class="info"><b id="fname"></b><span id="fstat"></span><small id="fdet"></small><small id="fok" hidden>Enough has been shown for a phone that saw everything. Keep playing until the phone says Transfer successful.</small></div>
     <div class="ctl">
       <details id="opts"><summary>Settings</summary>

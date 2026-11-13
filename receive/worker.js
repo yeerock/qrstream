@@ -3,6 +3,6 @@ importScripts('../core/qrtx.js', '../core/qrread.js');
 self.onmessage = e => {
   try {
     const { w, h, buf } = e.data;
-    self.postMessage({ texts: QRREAD.read({ data: new Uint8ClampedArray(buf), width: w, height: h }, 4) });
+    self.postMessage({ texts: QRREAD.read({ data: new Uint8ClampedArray(buf), width: w, height: h }, 5) });
   } catch (x) { self.postMessage({ texts: [], error: String(x) }); }
 };
