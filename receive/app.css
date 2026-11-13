@@ -52,3 +52,4 @@ li button{min-height:44px;padding:0 12px;border-radius:8px;border:1px solid var(
 .crumb a{display:inline-block;padding:12px 4px;min-height:44px}
 .acts{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 @media (orientation:landscape){.guide{width:min(86%,150vh);aspect-ratio:16/9}}
+.by{font-size:12px;letter-spacing:.04em;opacity:.8}

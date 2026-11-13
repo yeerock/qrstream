@@ -24,3 +24,4 @@ details{margin-top:20px;color:var(--mut)}summary{cursor:pointer;color:var(--fg)}
 .ctl{flex:none;justify-content:flex-end}#opts{margin:0;display:flex;gap:8px}#opts[open]{display:flex;flex-wrap:nowrap;align-items:center}#opts summary{display:none}.btns{display:flex;gap:8px}
 #play.enough #bar{box-shadow:inset 0 3px 0 var(--ok)}
 @media (max-width:600px){#bar{flex-wrap:wrap;gap:8px;padding-top:8px}#ecode{width:72px;height:72px}#join figcaption{display:none}.ctl{flex:1 1 100%}#opts{display:block;width:100%}#opts summary{display:list-item;min-height:36px;padding:6px 4px;color:var(--mut);font-size:14px}.btns{width:100%}.btns button{flex:1;padding:0 8px}.info small{white-space:normal}}
+.by{font-size:12px;letter-spacing:.04em;opacity:.8}

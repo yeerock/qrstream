@@ -1,5 +1,6 @@
 <p align="center"><img src="icon.svg" width="80" alt=""></p>
 <h1 align="center">QRStream</h1>
+<p align="center"><sub>by <a href="https://vyrox.com/">VYROX</a></sub></p>
 <p align="center"><b>Send any file from a screen to a phone as a video of QR codes.</b><br>
 One way · no network · no pairing · no app · no upload · <b>zero dependencies</b> · SHA-256 checked · fully automatic</p>
 <p align="center">

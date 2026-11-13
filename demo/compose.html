@@ -16,7 +16,7 @@ window.compose = async (rxCount, rxFps, title) => {
     const t = document.createElement('canvas'); t.width = bm.w; t.height = bm.h; t.getContext('2d').putImageData(im, 0, 0); x.imageSmoothingEnabled = false; x.fillStyle = '#fff';
     const W2 = Math.min(w, 1100), H2 = h * W2 / w; x.fillRect(X - 16, Y - 16, W2 + 32, H2 + 32); x.drawImage(t, X, Y, W2, H2); };
   const scenes = [
-    [3, () => { bg(); center('QRStream', 430, 110, '#eef2f6', 800); grad('Send a file from a screen to a phone with only light', 540, 46); center('No Wi-Fi · no Bluetooth · no cable · no pairing · no upload · no library', 620, 32, '#9fb0c0', 500); }],
+    [3, () => { bg(); center('QRStream', 430, 110, '#eef2f6', 800); center('by VYROX', 478, 30, '#9fb0c0', 500); grad('Send a file from a screen to a phone with only light', 540, 46); center('No Wi-Fi · no Bluetooth · no cable · no pairing · no upload · no library', 620, 32, '#9fb0c0', 500); }],
     [5, () => { bg(); center('How it works', 300, 72, '#eef2f6', 800);
       ['1. The sender turns the file into an endless stream of QR codes (fountain code)', '2. Smart mode mixes fast and safe codes; missed frames never need resending', '3. The phone reads them with its own QR reader, checks SHA-256, shares to any app']
         .forEach((t, i) => center(t, 430 + i * 80, 34, '#9fb0c0', 500)); }],
@@ -33,7 +33,7 @@ window.compose = async (rxCount, rxFps, title) => {
     x.font = font(500, 26); x.fillStyle = '#9fb0c0'; x.fillText('Real run: the receiver films the stream through its camera and decodes it with our own QR reader', 960, 1045);
     await sleep(1000 / 30);
   }
-  bg(); grad('Transfer verified', 440, 96); center(title, 530, 40, '#9fb0c0', 500); center('Open source · MIT · zero dependencies · github.com/yeerock/qrstream', 610, 34, '#9fb0c0', 500); center('Try it: yeerock.github.io/qrstream', 670, 34, '#9fb0c0', 500);
+  bg(); grad('Transfer verified', 440, 96); center(title, 530, 40, '#9fb0c0', 500); center('Open source · MIT · zero dependencies · github.com/yeerock/qrstream \u00b7 by VYROX', 610, 34, '#9fb0c0', 500); center('Try it: yeerock.github.io/qrstream', 670, 34, '#9fb0c0', 500);
   await sleep(4000);
   const poster = c.toDataURL('image/png'); rec.stop(); await new Promise(r => rec.onstop = r);
   const buf = new Uint8Array(await new Blob(parts, { type: 'video/webm' }).arrayBuffer()); let s = ''; for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode(...buf.subarray(i, i + 32768));

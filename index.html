@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0f1720"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta property="og:type" content="website"><meta property="og:title" content="QRStream: send a file from a screen to a phone with QR codes"><meta property="og:description" content="One way, no network, no pairing, no upload. Own QR reader and erasure code, zero dependencies, MIT."><meta property="og:url" content="https://yeerock.github.io/qrstream/"><meta property="og:image" content="https://yeerock.github.io/qrstream/docs/demo-poster.png"><meta name="twitter:card" content="summary_large_image"><link rel="stylesheet" href="site.css"></head>
 <body>
-<header class="top"><a class="brand" href="./"><img src="icon.svg" alt="" width="28" height="28">QRStream</a><nav><a class="go" href="send/">Send</a><a class="go" href="receive/">Receive</a><a href="#how">How</a><a href="#use">Use cases</a><a href="#when">When</a><a href="#demo">Demo</a><a href="https://github.com/yeerock/qrstream">GitHub</a></nav></header>
+<header class="top"><a class="brand" href="./"><img src="icon.svg" alt="" width="28" height="28">QRStream<span class="by">by VYROX</span></a><nav><a class="go" href="send/">Send</a><a class="go" href="receive/">Receive</a><a href="#how">How</a><a href="#use">Use cases</a><a href="#when">When</a><a href="#demo">Demo</a><a href="https://github.com/yeerock/qrstream">GitHub</a></nav></header>
 
 <section class="hero">
   <div class="copy">
@@ -16,7 +16,7 @@
     <div class="cta"><a class="btn primary" href="send/">Send a file</a><a class="btn" href="receive/">Receive on this phone</a></div>
     <p class="small">Try it now: open <b>Send</b> on a computer and <b>Receive</b> on a phone, tap <i>Use a demo picture</i>, point the camera.</p>
   </div>
-  <figure class="live" aria-label="A live QR stream made by the same code the sender uses"><canvas id="hero" width="80" height="80"></canvas><figcaption id="herocap" aria-hidden="true">Live stream · every code is new</figcaption></figure>
+  <figure class="live" aria-label="A live QR stream made by the same code the sender uses"><canvas id="hero" width="80" height="80"></canvas><figcaption id="herocap" aria-hidden="true">Live stream · 4 codes a screen · every code is new</figcaption><button id="heroplay" class="btn" hidden>Play the stream</button></figure>
 </section>
 
 <section id="what" class="band"><h2>What it is</h2>
@@ -96,6 +96,6 @@
   <details><summary>Can I embed the sender in my own product?</summary><p>Yes. <code>core/qrtx.js</code> is one dependency-free file; see the README for the API. MIT licence.</p></details>
 </section>
 
-<footer><p>QRStream · MIT licence · <a href="https://github.com/yeerock/qrstream/blob/main/docs/METHODOLOGY.md">Methodology</a> · <a href="https://github.com/yeerock/qrstream">Source</a></p></footer>
+<footer><p>QRStream by <a href="https://vyrox.com/" rel="noopener">VYROX</a> · MIT licence · <a href="https://github.com/yeerock/qrstream/blob/main/docs/METHODOLOGY.md">Methodology</a> · <a href="https://github.com/yeerock/qrstream">Source</a></p></footer>
 <script src="core/qrtx.js"></script><script src="site.js"></script>
 </body></html>

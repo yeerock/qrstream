@@ -23,3 +23,6 @@ details{border-bottom:1px solid var(--line);padding:12px 0}summary{cursor:pointe
 footer{text-align:center;color:var(--mut);padding:32px 16px;border-top:1px solid var(--line)}
 :root{--acc:#1f63d8;--line:#5b6b7c}.card,.steps li,.top,.spec th,.spec td,details,footer{border-color:#243241}:focus-visible{outline:3px solid #8fb8ff;outline-offset:2px}
 summary{min-height:44px;display:list-item;padding:10px 0}details{padding:2px 0}footer a{display:inline-block;padding:12px 4px}.btn.primary{color:#fff}
+#heroplay{margin:10px auto 0;min-height:44px;color:#0b1118;border-color:#5b6b7c;background:#fff;cursor:pointer;font:600 15px system-ui,sans-serif}
+[hidden]{display:none!important}
+.by{font-weight:500;font-size:12px;color:var(--mut);letter-spacing:.04em;margin-left:2px;align-self:flex-end;padding-bottom:2px}
