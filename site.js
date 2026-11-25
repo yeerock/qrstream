@@ -23,8 +23,8 @@
 
 // Try it: the demo is the real sender in guided mode (send/?demo&simple), loaded only when asked. The page code lets a visitor open this page on a phone.
 (() => {
-  const go = document.getElementById('try-go'), fr = document.getElementById('try-frame');
-  if (go && fr) go.onclick = () => { fr.src = 'send/?demo&simple'; fr.hidden = false; go.hidden = true; fr.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
+  const fr = document.getElementById('try-frame');
+  for (const id of ['try-go', 'try-pic']) { const b = document.getElementById(id); if (b && fr) b.onclick = () => { fr.src = 'send/?demo' + (b.dataset.demo ? '=' + b.dataset.demo : '') + '&simple'; fr.hidden = false; document.getElementById('try-go').hidden = document.getElementById('try-pic').hidden = true; fr.scrollIntoView({ block: 'center', behavior: 'smooth' }); }; }
   const pc = document.getElementById('pagecode'); if (!pc || !window.QRTX) return;
   const q = QRTX.encode(location.origin + location.pathname), n = q.size + 8; pc.width = pc.height = n;
   const x = pc.getContext('2d'), im = x.createImageData(n, n), d = new Uint32Array(im.data.buffer); d.fill(0xFFFFFFFF);

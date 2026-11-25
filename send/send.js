@@ -184,7 +184,9 @@
     const t = 'QRStream demo file\n\n' + Array.from({ length: 120 }, (_, i) => `Line ${i + 1}: a file can travel from a screen to a phone as a stream of QR codes, one way, with no network.`).join('\n') + '\n';
     return new File([t], 'qrstream-demo.txt', { type: 'text/plain' });
   }
+  const demoVideo = () => fetch('../docs/demo-cctv.mp4').then(r => r.blob()).then(b => new File([b], 'demo-cctv.mp4', { type: 'video/mp4' }));
+  $('demovid').onclick = async () => send(await demoVideo());
   $('demo').onclick = async () => send(await demoPicture());
   $('demotxt').onclick = () => send(demoText());
-  if (P.has('demo')) (P.get('demo') === 'text' ? Promise.resolve(demoText()) : demoPicture()).then(send);
+  if (P.has('demo')) (P.get('demo') === 'text' ? Promise.resolve(demoText()) : P.get('demo') === 'video' ? demoVideo() : demoPicture()).then(send);
 })();
