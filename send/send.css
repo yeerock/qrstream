@@ -45,3 +45,5 @@ option:disabled{color:#7b8794}
 .simple #bar{padding:6px 12px;gap:6px}.simple #ecode{width:64px;height:64px}.simple #join figcaption{display:none}
 
 .simple #close{display:none}.simple #fstat{white-space:normal;font-size:15px;color:var(--fg)}
+
+.simple #pause.primary{flex:1;min-height:52px;font-size:17px}.simple .btns{flex:1}

@@ -48,7 +48,7 @@
     // Receivers from before the checks ignore the fields. A name too long to leave room for them is sent without (the receiver then reads everything again, as before).
     const data = QRTX.seal(meta, body), s = new QRTX.Stream(data, crypto.getRandomValues(new Uint32Array(1))[0]);
     const entry = QRTX.encode(RECEIVER), cv = $('qr');
-    const still = matchMedia('(prefers-reduced-motion: reduce)').matches && !TEST;   // people who asked for less motion start the flicker themselves
+    const still = (matchMedia('(prefers-reduced-motion: reduce)').matches || SIMPLE) && !TEST;   // guided demo: waits for the user (the link is one way, so the page cannot see the scan)   // people who asked for less motion start the flicker themselves
     let bigUntil = 0; let paused = still, timer = 0, last = 0, frames = 0, syms = 0, shownMs = 0, wl = null; const need = Math.ceil(data.length / QRTX.SYMBOL);
     // ---- Smart mode (Density Auto): no back channel, so the stream optimises itself.
     // 1. From this screen's real device pixels, find the layouts (QR version x codes side by side) whose modules are big enough to film.
@@ -105,7 +105,7 @@
       if (smart()) rate = plan.reduce((a, e) => a + capOf(e), 0) / round; else rate = k * QRTX.symbolsIn(v) * QRTX.SYMBOL * fps * (cur().colour ? 3 : 1);
       const head = smart() ? `Smart: ${shape(plan[0][0].k, plan[0][0].c)} v${plan[0][0].v}, about ${Math.round(plan.length / round)} screens a second, ${plan.length === 1 ? 'every frame in colour' : `with ${hasColour() ? 'colour frames and ' : ''}safer frames woven in`}` : `${shape(k, cur().c)} QR v${v} \u00b7 ${fps}/s`, pass = syms / need, secs = Math.max(1, Math.ceil(data.length * 1.02 / rate));
       const set = (id, t) => { const e = $(id); if (e.textContent !== t) e.textContent = t; };
-      set('fstat', paused ? (frames ? 'Paused' : "Ready. Scan this code with the phone's camera to open the receiver, then press Start stream.") : entryOn ? "Scan this code with the phone's camera to open the receiver. The file starts in a moment." : `Showing for ${clock(shownMs)}${pass >= 2 ? ` \u00b7 shown ${Math.floor(pass)} times over` : ''} \u00b7 a phone needs about ${secs} s of clear view`);
+      set('fstat', paused ? (frames ? 'Paused' : (SIMPLE ? "Scan this code with your phone camera. When the receiver is open, press the blue button." : "Ready. Scan this code with the phone's camera to open the receiver, then press Start stream.")) : entryOn ? "Scan this code with the phone's camera to open the receiver. The file starts in a moment." : `Showing for ${clock(shownMs)}${pass >= 2 ? ` \u00b7 shown ${Math.floor(pass)} times over` : ''} \u00b7 a phone needs about ${secs} s of clear view`);
       set('fdet', performance.now() < kNoteUntil ? kNote : `${sz(file.size)}${zipped ? ' (gzip ' + sz(data.length) + ')' : ''} \u00b7 ${head} \u00b7 up to ${sz(rate)}/s`);
       $('fdet').title = $('fdet').textContent;
       if (!$('hud').hidden) { set('h-rate', sz(rate) + '/s'); set('h-size', sz(file.size)); set('h-need', secs + ' s'); set('h-time', clock(shownMs)); }   // live speed tiles of guided mode (?simple)
@@ -120,7 +120,7 @@
       fit(cv); stat();
     };
     const tick = t => { timer = requestAnimationFrame(tick); if (paused) { last = t; return; } const dt = t - last; if (dt < 1000 / cur().fps - 2) return; if (last) shownMs += Math.min(dt, 500); last = t; step(t < bigUntil); };
-    const setPause = p => { paused = p; $('pause').textContent = p ? (frames ? 'Resume' : 'Start stream') : 'Pause'; $('ssay').textContent = p ? 'Paused' : 'Stream playing'; stat(); };
+    const setPause = p => { paused = p; $('pause').textContent = p ? (frames ? 'Resume' : SIMPLE ? 'My phone is ready: start' : 'Start stream') : 'Pause'; if (SIMPLE) $('pause').classList.toggle('primary', p && !frames); $('ssay').textContent = p ? 'Paused' : 'Stream playing'; stat(); };
     $('fname').textContent = file.name; $('pickview').hidden = true; $('play').hidden = false; $('opts').open = innerWidth > 600;
     $('fchk').textContent = 'Check code ' + meta.sha256.slice(0, 16).match(/.{4}/g).join(' '); $('fchk').title = 'Start of the SHA-256 of the file. The receiver shows the same code for the same file.';
     if (SIMPLE) { $('play').classList.add('simple'); $('hud').hidden = false; $('opts').open = false; $('k').value = '4'; $('fs').textContent = 'Full screen (faster)'; }   // the guided demo shows 4 codes (2 by 2); refreshK() falls back to Auto if they do not fit
