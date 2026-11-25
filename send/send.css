@@ -41,3 +41,5 @@ option:disabled{color:#7b8794}
 .hud .tile{background:#ffffff0d;border-radius:10px;padding:6px 10px;min-width:0}.hud small{display:block;color:var(--mut);font-size:12px}.hud b{display:block;font-size:20px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .simple #opts,.simple #fs,.simple #fdet,.simple #fchk,.simple #fok{display:none!important}
 @media (max-width:600px){.hud{grid-template-columns:repeat(2,1fr)}.hud b{font-size:17px}}
+.simple .hud{grid-template-columns:repeat(4,1fr);gap:6px;padding:6px 10px}.simple .hud .tile{padding:4px 8px}.simple .hud small{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.simple .hud b{font-size:16px}
+.simple #bar{padding:6px 12px;gap:6px}.simple #ecode{width:64px;height:64px}.simple #join figcaption{display:none}

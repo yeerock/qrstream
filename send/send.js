@@ -123,7 +123,7 @@
     const setPause = p => { paused = p; $('pause').textContent = p ? (frames ? 'Resume' : 'Start stream') : 'Pause'; $('ssay').textContent = p ? 'Paused' : 'Stream playing'; stat(); };
     $('fname').textContent = file.name; $('pickview').hidden = true; $('play').hidden = false; $('opts').open = innerWidth > 600;
     $('fchk').textContent = 'Check code ' + meta.sha256.slice(0, 16).match(/.{4}/g).join(' '); $('fchk').title = 'Start of the SHA-256 of the file. The receiver shows the same code for the same file.';
-    if (SIMPLE) { $('play').classList.add('simple'); $('hud').hidden = false; $('opts').open = false; }
+    if (SIMPLE) { $('play').classList.add('simple'); $('hud').hidden = false; $('opts').open = false; $('k').value = '4'; }   // the guided demo shows 4 codes (2 by 2); refreshK() falls back to Auto if they do not fit
     refreshK(); makePlan();   // measured on the visible stage
     draw($('ecode'), entry); { const e = $('ecode'), m = Math.max(1, Math.floor(96 * dpr() / e.width)); e.style.width = e.style.height = (m * e.width / dpr()) + 'px'; }   // whole device pixels per module, like the stage
     draw(cv, entry); fit(cv); setPause(still); $('pause').focus();
