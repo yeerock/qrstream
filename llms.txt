@@ -1,0 +1,11 @@
+# QRStream
+
+> Free, open-source (MIT) web tool by VYROX that sends a file from a screen to a phone as a video of QR codes. One way, no network, no pairing, no upload. The phone films the screen, rebuilds the file and checks its SHA-256.
+
+Key facts: speed about 40 to 130 KB/s depending on screen (simulator-measured: 300 KB in 4.5 s on Full HD; not yet measured on physical phones). Files up to 10 MB, best up to a few MB. Own QR encoder/reader and fountain erasure code, zero dependencies.
+
+- [Home, live demo, walkthrough, speed test](https://yeerock.github.io/qrstream/)
+- [Sender](https://yeerock.github.io/qrstream/send/)
+- [Receiver](https://yeerock.github.io/qrstream/receive/)
+- [Methodology](https://github.com/yeerock/qrstream/blob/main/docs/METHODOLOGY.md)
+- [Source and README](https://github.com/yeerock/qrstream)

@@ -8,8 +8,16 @@ One way · no network · no pairing · no app · no upload · <b>zero dependenci
 <a href="https://yeerock.github.io/qrstream/send/">Sender</a> ·
 <a href="https://yeerock.github.io/qrstream/receive/">Receiver</a> ·
 <a href="docs/METHODOLOGY.md">Methodology</a> ·
-<a href="https://yeerock.github.io/qrstream/#demo">Demo video</a>
+<a href="https://yeerock.github.io/qrstream/#tour">Walkthrough</a> · <a href="https://yeerock.github.io/qrstream/#speed">Speed test</a>
 </p>
+
+## Try it in 30 seconds
+
+1. Open **https://yeerock.github.io/qrstream/** on a computer and press **Start demo**.
+2. Scan the small code with a phone camera. The receiver opens and starts its camera.
+3. Point at the big code. The picture appears on the phone.
+
+No second device? The page has a **speed test** that runs the real encoder, reader and decoder in the browser, with simulated code loss, and checks the SHA-256. It also has a six-step walkthrough of how it works, with a live fountain-code demo.
 
 [![QRStream demo](docs/demo-poster.png)](https://yeerock.github.io/qrstream/#demo)
 

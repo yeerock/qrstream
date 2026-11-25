@@ -35,3 +35,9 @@ details{margin-top:20px;color:var(--mut)}summary{cursor:pointer;color:var(--fg)}
 @media (max-width:600px){.info small{white-space:nowrap}#fok{white-space:normal;height:3.75em}.optrow label{flex:1}.optrow select{flex:1;min-width:0}}
 option:disabled{color:#7b8794}
 @media (max-width:600px){#fok{display:none}}
+
+/* 2.5: guided mode (?simple): big code, four live speed tiles, no settings. Used by the demo on the home page. */
+.hud{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px 16px;background:var(--bg);border-top:1px solid #243241}
+.hud .tile{background:#ffffff0d;border-radius:10px;padding:6px 10px;min-width:0}.hud small{display:block;color:var(--mut);font-size:12px}.hud b{display:block;font-size:20px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.simple #opts,.simple #fs,.simple #fdet,.simple #fchk,.simple #fok{display:none!important}
+@media (max-width:600px){.hud{grid-template-columns:repeat(2,1fr)}.hud b{font-size:17px}}

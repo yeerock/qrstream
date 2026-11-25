@@ -20,3 +20,13 @@
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { cap.textContent = `One screen of a stream: four codes, ${rate} when playing`; if (btn) { btn.hidden = false; btn.textContent = 'Play the stream'; } return; }
   play();
 })();
+
+// Try it: the demo is the real sender in guided mode (send/?demo&simple), loaded only when asked. The page code lets a visitor open this page on a phone.
+(() => {
+  const go = document.getElementById('try-go'), fr = document.getElementById('try-frame');
+  if (go && fr) go.onclick = () => { fr.src = 'send/?demo&simple'; fr.hidden = false; go.hidden = true; fr.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
+  const pc = document.getElementById('pagecode'); if (!pc || !window.QRTX) return;
+  const q = QRTX.encode(location.origin + location.pathname), n = q.size + 8; pc.width = pc.height = n;
+  const x = pc.getContext('2d'), im = x.createImageData(n, n), d = new Uint32Array(im.data.buffer); d.fill(0xFFFFFFFF);
+  for (let y = 0; y < q.size; y++) for (let i = 0; i < q.size; i++) if (q.m[y * q.size + i]) d[(y + 4) * n + 4 + i] = 0xFF000000; x.putImageData(im, 0, 0);
+})();

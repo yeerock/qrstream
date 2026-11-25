@@ -1,67 +1,77 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self'; frame-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<script src="guard.js?v=2.4.0"></script>
-<title>QRStream: send a file from a screen to a phone with QR codes, no network</title><meta name="description" content="Send any file from a screen to a phone as a video of QR codes. One way, no network, no pairing, no upload. Fountain coded and SHA-256 checked. Open source.">
+<script src="guard.js?v=2.5.0"></script>
+<title>QRStream: send a file to a phone with QR codes, no network</title>
+<meta name="description" content="Send a file from a screen to a phone as moving QR codes. No Wi-Fi, no pairing, no upload. Try it in 30 seconds. Free and open source.">
+<link rel="canonical" href="https://yeerock.github.io/qrstream/">
 <meta name="theme-color" content="#0f1720"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<meta property="og:type" content="website"><meta property="og:title" content="QRStream: send a file from a screen to a phone with QR codes"><meta property="og:description" content="One way, no network, no pairing, no upload. Own QR reader and erasure code, zero dependencies, MIT."><meta property="og:url" content="https://yeerock.github.io/qrstream/"><meta property="og:image" content="https://yeerock.github.io/qrstream/docs/demo-poster.png"><meta name="twitter:card" content="summary_large_image"><link rel="stylesheet" href="site.css?v=2.4.0"></head>
+<meta property="og:type" content="website"><meta property="og:title" content="QRStream: send a file to a phone with QR codes"><meta property="og:description" content="No network, no pairing, no upload. Try it in 30 seconds."><meta property="og:url" content="https://yeerock.github.io/qrstream/"><meta property="og:image" content="https://yeerock.github.io/qrstream/docs/og.png"><meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"SoftwareApplication","name":"QRStream","applicationCategory":"UtilitiesApplication","operatingSystem":"Any modern browser","description":"Send a file from a screen to a phone as a stream of QR codes. One way, no network, SHA-256 checked.","url":"https://yeerock.github.io/qrstream/","license":"https://opensource.org/licenses/MIT","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"VYROX","url":"https://vyrox.com/"}},{"@type":"WebSite","name":"QRStream","url":"https://yeerock.github.io/qrstream/"},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is QRStream?","acceptedAnswer":{"@type":"Answer","text":"A free web tool that sends a file from a screen to a phone as a video of QR codes. The phone films the screen and rebuilds the file. No network, pairing or upload is involved."}},{"@type":"Question","name":"How fast is it?","acceptedAnswer":{"@type":"Answer","text":"About 40 to 130 KB per second depending on the screen. A 300 KB file takes about 5 seconds on a Full HD screen in simulated-camera tests. Not yet measured on physical phones."}},{"@type":"Question","name":"Does the phone need internet?","acceptedAnswer":{"@type":"Answer","text":"Only once, to load the receiver page. The transfer itself uses no network."}},{"@type":"Question","name":"How much does it cost?","acceptedAnswer":{"@type":"Answer","text":"Nothing. QRStream is open source under the MIT licence."}}]}]}</script>
+<link rel="stylesheet" href="site.css?v=2.5.0"></head>
 <body>
-<header class="top"><a class="brand" href="./"><img src="icon.svg" alt="" width="28" height="28">QRStream<span class="by">by VYROX</span></a><nav><a class="go" href="send/">Send</a><a class="go" href="receive/">Receive</a><a href="#how">How</a><a href="#use">Use cases</a><a href="#when">When</a><a href="#demo">Demo</a><a href="https://github.com/yeerock/qrstream">GitHub</a></nav></header>
+<header class="top"><a class="brand" href="./"><img src="icon.svg" alt="" width="28" height="28">QRStream<span class="by">by VYROX</span></a><nav><a class="go" href="send/">Send</a><a class="go" href="receive/">Receive</a><a href="#try">Try it</a><a href="#tour">How it works</a><a href="#speed">Speed</a><a href="#faq">FAQ</a><a href="https://github.com/yeerock/qrstream">GitHub</a></nav></header>
 
 <section class="hero">
   <div class="copy">
-    <p class="eyebrow">Open source · MIT · Zero dependencies · Runs in current Chrome, Edge, Firefox and Safari</p>
-    <h1>Move a file from a screen to a phone <span class="hl">with only light.</span></h1>
-    <p class="lead">QRStream plays any file as a video of QR codes. A phone films the screen and rebuilds the file, checks it with SHA-256 and keeps it. No Wi-Fi, no Bluetooth, no cable, no pairing, no account, no upload.</p>
-    <div class="cta"><a class="btn primary" href="send/">Send a file</a><a class="btn" href="receive/">Receive on this phone</a></div>
-    <p class="small">Try it now: open <b>Send</b> on a computer and <b>Receive</b> on a phone, tap <i>Use a demo picture</i>, point the camera.</p>
+    <p class="eyebrow">Free · Open source · No install</p>
+    <h1>Send a file to a phone <span class="hl">with only light.</span></h1>
+    <p class="lead">The screen plays QR codes. The phone films them and rebuilds the file. No Wi-Fi, no pairing, no upload.</p>
+    <div class="cta"><a class="btn primary" href="#try">Try it in 30 seconds</a><a class="btn" href="#tour">See how it works</a></div>
+    <p class="small">Needs a computer (the screen) and a phone (the camera).</p>
   </div>
-  <figure class="live" aria-label="A live QR stream made by the same code the sender uses"><canvas id="hero" width="80" height="80"></canvas><figcaption id="herocap" aria-hidden="true">Live stream · 4 codes a screen · every code is new</figcaption><button id="heroplay" class="btn">Pause the stream</button></figure>
+  <figure class="live" aria-label="A live QR stream made by the same code the sender uses"><canvas id="hero" width="80" height="80"></canvas><figcaption id="herocap" aria-hidden="true">Live stream · every code is new</figcaption><button id="heroplay" class="btn">Pause the stream</button></figure>
 </section>
 
-<section id="what" class="band"><h2>What it is</h2>
-  <div class="grid3">
-    <div class="card"><h3>A one-way data link</h3><p>The sender only shows pictures; the receiver only looks. Nothing travels back, so there is nothing to pair, connect or attack over a network.</p></div>
-    <div class="card"><h3>Loss does not matter</h3><p>Every frame carries fresh fountain-coded data. Blur, glare or a missed frame costs a little time, never a restart. Any set of symbols about 2 % larger than the file rebuilds it.</p></div>
-    <div class="card"><h3>Checked and private</h3><p>Every frame has a CRC-32, the whole file a SHA-256. The file stays in the receiving browser; it can be opened, saved, or handed to the phone's own share sheet.</p></div>
+<section id="try" class="band"><h2>Try it now</h2>
+  <div class="try">
+    <ol class="steps3">
+      <li><b>1</b><div><h3>Start the demo</h3><p>Press <i>Start demo</i>. This page sends a demo picture.</p></div></li>
+      <li><b>2</b><div><h3>Scan the small code with your phone</h3><p>Use the normal camera app. It opens the receiver and starts its camera.</p></div></li>
+      <li><b>3</b><div><h3>Point at the big code</h3><p>Hold still. The picture appears on the phone with <i>Open, Save, Share</i>.</p></div></li>
+    </ol>
+    <div class="demo">
+      <button id="try-go" class="btn primary big">Start demo</button>
+      <iframe id="try-frame" title="QRStream live demo sender" hidden loading="lazy"></iframe>
+    </div>
   </div>
+  <div class="alt"><div class="card"><h3>Only a phone?</h3><p>Open this page on a computer, or run the <a href="#speed">camera-free speed test</a> below.</p></div><div class="card"><h3>Open this page on your phone</h3><canvas id="pagecode" width="29" height="29" role="img" aria-label="QR code of this page"></canvas></div><div class="card"><h3>Your own file</h3><p>Use the <a href="send/">full sender</a>: choose, drop or paste a file.</p></div></div>
 </section>
 
-<section id="how"><h2>How to use it</h2>
-  <ol class="steps">
-    <li><b>1</b><h3>Pick a file on the sender</h3><p>Open <a href="send/">Send</a> on the screen that holds the file (a kiosk, a lab PC, a laptop) and choose a file, drop it, paste a copied picture, or type some text.</p></li>
-    <li><b>2</b><h3>Film the screen</h3><p>The stream starts with a link code: scan it with the phone's camera app. The receiver opens and starts its camera by itself (tap <i>Start Camera</i> if asked). The same code stays in the corner of the sender for phones that arrive late. Hold still so the whole code is in the frame.</p></li>
-    <li><b>3</b><h3>Open, save or share</h3><p>The percent climbs on the phone. When the file checks out it is shown right in the camera box with <i>Open, Save, Share, Email</i>. Share uses the phone's own share sheet (AirDrop, Messages, WhatsApp, Files, Drive...).</p></li>
-  </ol>
-  <p class="note">No camera at hand? Record the screen with any phone, then use <i>Use a Video of the Code</i> on the receiver.</p>
+<section id="tour"><h2>How it works, in six steps</h2>
+  <div class="tour"><p id="tour-n" class="small"></p><h3 id="tour-h"></h3><p id="tour-p" class="tp"></p><div id="tour-vis" class="tvis" aria-live="polite"></div>
+    <div class="tnav"><button id="tour-prev" class="btn" type="button">Back</button><span id="tour-dots" class="dots"></span><button id="tour-next" class="btn primary" type="button">Next</button></div></div>
 </section>
 
-<section id="use" class="band"><h2>Use cases</h2>
-  <div class="grid3 uc">
-    <div class="card"><h3>Isolated and secure systems</h3><p>Take a report or log off a machine that must never join a network, without USB sticks that carry malware the other way.</p></div>
-    <div class="card"><h3>Kiosks, HMIs and embedded screens</h3><p>Industrial panels, CCTV/NVR monitors, medical carts and point-of-sale screens that have a display but no friendly way to export.</p></div>
-    <div class="card"><h3>Field work with no signal</h3><p>Mines, ships, plants, basements and remote sites: the receiver works offline after one visit (it installs as a web app).</p></div>
-    <div class="card"><h3>Evidence and incident capture</h3><p>Hand a camera still, a short clip or a PDF to an inspector's phone on the spot, with a SHA-256 check and a 16-character check code on both screens to compare.</p></div>
-    <div class="card"><h3>Guests and BYOD</h3><p>Give a visitor a file without giving them your Wi-Fi password, an app, or an email address.</p></div>
-    <div class="card"><h3>Demos, classrooms, events</h3><p>Put a handout, a config or a ticket on a projector; everyone in the room films it at once. One sender, any number of receivers.</p></div>
-  </div>
-</section>
-
-<section id="when"><h2>When to use it, and when not</h2>
+<section id="speed" class="band"><h2>How fast is it?</h2>
+  <p>About <b>40 to 130 KB per second</b>, depending on the screen. A 300 KB file takes about 5 seconds on a Full HD screen (camera simulator; not yet measured on physical phones).</p>
   <div class="grid2">
-    <div class="card good"><h3>Good fit</h3><ul><li>Files up to a few MB: pictures, short clips, PDFs, Office files, logs, configs, keys.</li><li>There is a screen, a camera, and no shared network, or a network you must not use.</li><li>You want zero setup on the sender beyond a web page.</li><li>Many receivers at once.</li></ul></div>
-    <div class="card bad"><h3>Use something else</h3><ul><li>Large files (tens of MB and up): even at about 130 KB/s on a large screen a 10 MB file needs well over a minute, and longer on a small screen.</li><li>You need the phone to send back to the screen: this link is one way by design.</li><li>The screen is very small or the camera very poor: use a lower density, or a cable.</li><li>Secret data on a screen others can film: anyone with a camera in view can receive it too.</li></ul></div>
+    <div class="card"><h3>Speed test: no camera needed</h3><p>This browser encodes a random file, draws the codes, reads them back and checks the SHA-256. Real code, ideal camera.</p>
+      <div class="ctrl"><label>File <select id="sp-size"><option value="102400">100 KB</option><option value="307200" selected>300 KB</option><option value="1048576">1 MB</option></select></label><label>Codes lost <select id="sp-loss"><option value="0">0 %</option><option value="20" selected>20 %</option><option value="40">40 %</option></select></label><button id="sp-run" class="btn primary" type="button" aria-pressed="false">Run the speed test</button></div>
+      <div id="sp-barw" class="pbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Progress"><i id="sp-bar"></i></div>
+      <div class="tiles"><div><small>Done</small><b id="sp-pct">0%</b></div><div><small>Time on screen</small><b id="sp-time">0.0 s</b></div><div><small>Speed</small><b id="sp-rate">-</b></div><div><small>Screens</small><b id="sp-scr">0</b></div><div><small>Codes lost</small><b id="sp-lost">0</b></div></div>
+      <p id="sp-ok" class="okline" hidden role="status"></p><p id="sp-done" class="small" hidden></p>
+      <canvas id="sp-cv" width="1920" height="1080" class="spcv" aria-label="The picture the reader is reading"></canvas></div>
+    <div class="card"><h3>How long for my file?</h3><div class="ctrl"><label>Size <input id="cl-size" type="number" min="1" value="500" inputmode="numeric"></label><label>Unit <select id="cl-unit"><option value="1" selected>KB</option><option value="1024">MB</option></select></label></div>
+      <ul id="cl-out" class="clout"></ul><p id="cl-note" class="small"></p>
+      <h3>Measured (camera simulator)</h3><ul class="clout"><li><span>300 KB random, Smart, 1080p</span><b>4.5 s</b></li><li><span>334 KB log (gzip)</span><b>0.9 s</b></li><li><span>400 KB, colour on every frame</span><b>2.9 s</b></li></ul></div>
   </div>
 </section>
 
-<section id="demo" class="band"><h2>Demo</h2>
-  <p>The clip below is a real run made by the test suite: the sender's stream is filmed by a simulated camera (tilt, blur, noise, uneven light), Chrome uses that as its camera, and the real receiver rebuilds the file and checks its SHA-256. Nothing is faked.</p>
-  <video id="demovid" aria-label="Demo: a file sent from the sender screen to the receiver through a simulated camera" controls playsinline preload="metadata" poster="docs/demo-poster.png" src="docs/demo.webm"></video>
-  <p class="small">Live demo: <a href="send/?demo">sender with a demo picture</a> · <a href="receive/">receiver</a>.</p>
+<section id="use"><h2>What is it for?</h2>
+  <div class="grid3 uc">
+    <div class="card"><h3>Isolated systems</h3><p>Take a log off a machine that must never join a network. No USB sticks.</p></div>
+    <div class="card"><h3>Kiosks and HMIs</h3><p>Panels, NVR monitors and POS screens that can show a page but not export.</p></div>
+    <div class="card"><h3>No signal</h3><p>Mines, ships, plants. The receiver works offline after one visit.</p></div>
+    <div class="card"><h3>Evidence capture</h3><p>Hand a picture or PDF to an inspector's phone with a SHA-256 check.</p></div>
+    <div class="card"><h3>Guests</h3><p>Give a file without sharing Wi-Fi, an app or an email.</p></div>
+    <div class="card"><h3>Rooms and events</h3><p>One projector, any number of phones.</p></div>
+  </div>
+  <div class="grid2 wn"><div class="card good"><h3>Good fit</h3><ul><li>Files up to a few MB.</li><li>A screen and a camera, no shared network.</li><li>Many receivers at once.</li></ul></div><div class="card bad"><h3>Use something else</h3><ul><li>Files over tens of MB.</li><li>The phone must send back: this link is one way.</li><li>Secret data where others can film the screen.</li></ul></div></div>
 </section>
 
-<section id="spec"><h2>Specifications</h2>
+<section id="spec" class="band"><h2>Specifications</h2>
   <table class="spec"><tbody>
     <tr><th>Code</th><td>QR Model 2 (ISO/IEC 18004), alphanumeric mode, error level L, versions 10 to 40; own encoder</td></tr>
     <tr><th>Payload text</th><td>Base45 (RFC 9285): 2 bytes in 3 QR alphanumeric characters</td></tr>
@@ -77,7 +87,7 @@
   </tbody></table>
 </section>
 
-<section id="security" class="band"><h2>Security and privacy</h2>
+<section id="security"><h2>Security and privacy</h2>
   <ul class="checks">
     <li>No server: both pages are static files. The receiver makes no network request with your data (strict Content-Security-Policy, <code>connect-src 'self'</code>).</li>
     <li>Received files are typed defensively: HTML, SVG, XML and scripts are opened as plain text, never run in the page.</li>
@@ -88,7 +98,9 @@
   </ul>
 </section>
 
-<section id="faq"><h2>FAQ</h2>
+<section id="faq" class="band"><h2>FAQ</h2>
+  <details open><summary>What is QRStream?</summary><p>A free web tool that sends a file from a screen to a phone as moving QR codes. The phone films the screen and rebuilds the file.</p></details>
+  <details><summary>How much does it cost?</summary><p>Nothing. MIT licence.</p></details>
   <details><summary>Does the phone need internet?</summary><p>Only once, to load the receiver. After that it starts from its offline cache. The transfer itself never uses a network.</p></details>
   <details><summary>Why do some codes look different?</summary><p>There is no back channel, so the sender cannot ask the camera what it reads best. Smart mode mixes the fastest readable layout with safer ones in a single stream; every frame carries useful data, so a good camera runs near full speed and a weak one still finishes. Symbols have a fixed size, so nothing received is ever wasted.</p></details>
   <details><summary>Why are some frames in colour?</summary><p>A colour frame holds three codes in one square (one each in red, green and blue), so it carries three times the data. Smart mode mixes them in when the squares are large enough. If your phone cannot read them it loses nothing but a little time: every frame carries fresh data, and the black and white frames alone complete the file. Set Colour to Off in Settings to send without them.</p></details>
@@ -99,6 +111,6 @@
   <details><summary>Can I embed the sender in my own product?</summary><p>Yes. <code>core/qrtx.js</code> is one dependency-free file; see the README for the API. MIT licence.</p></details>
 </section>
 
-<footer><p>QRStream by <a href="https://vyrox.com/" rel="noopener">VYROX</a> · MIT licence · <a href="https://github.com/yeerock/qrstream/blob/main/docs/METHODOLOGY.md">Methodology</a> · <a href="https://github.com/yeerock/qrstream">Source</a></p></footer>
-<script src="core/qrtx.js?v=2.4.0"></script><script src="site.js?v=2.4.0"></script>
+<footer><p>QRStream by <a href="https://vyrox.com/" rel="noopener">VYROX</a> · MIT licence · Updated 2026-11-25 · <a href="https://github.com/yeerock/qrstream/blob/main/docs/METHODOLOGY.md">Methodology</a> · <a href="https://github.com/yeerock/qrstream">Source</a></p></footer>
+<script src="core/qrtx.js?v=2.5.0"></script><script src="core/qrread.js?v=2.5.0"></script><script src="site.js?v=2.5.0"></script><script src="tour.js?v=2.5.0"></script><script src="speed.js?v=2.5.0"></script>
 </body></html>

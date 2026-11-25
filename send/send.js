@@ -8,7 +8,7 @@
   const $ = i => document.getElementById(i);
   const LEVELS = [[40, 30], [40, 20], [40, 15], [40, 12], [33, 12], [25, 10], [15, 8]];   // QR version, codes per second (per code slot)
   const MAX = 10 * 1048576, RECEIVER = new URL('../receive/?go', location.href).href;
-  const P = new URLSearchParams(location.search), TEST = P.has('test');   // test mode: frames advance only when the test asks (deterministic recording)
+  const P = new URLSearchParams(location.search), TEST = P.has('test'), SIMPLE = P.has('simple');   // test mode: frames advance only when the test asks (deterministic recording)
   const sz = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1000 ? Math.round(n / 1024) + ' KB' : Math.max(0, Math.round(n)) + ' bytes';
   $('rx').textContent = RECEIVER.replace('?go', '');
   if (/^(auto|off|only)$/.test(P.get('col') || '')) $('col').value = P.get('col');   // ?col=off or ?col=only: colour frames off, or on every frame (tests and trials)
@@ -108,6 +108,7 @@
       set('fstat', paused ? (frames ? 'Paused' : "Ready. Scan this code with the phone's camera to open the receiver, then press Start stream.") : entryOn ? "Scan this code with the phone's camera to open the receiver. The file starts in a moment." : `Showing for ${clock(shownMs)}${pass >= 2 ? ` \u00b7 shown ${Math.floor(pass)} times over` : ''} \u00b7 a phone needs about ${secs} s of clear view`);
       set('fdet', performance.now() < kNoteUntil ? kNote : `${sz(file.size)}${zipped ? ' (gzip ' + sz(data.length) + ')' : ''} \u00b7 ${head} \u00b7 up to ${sz(rate)}/s`);
       $('fdet').title = $('fdet').textContent;
+      if (!$('hud').hidden) { set('h-rate', sz(rate) + '/s'); set('h-size', sz(file.size)); set('h-need', secs + ' s'); set('h-time', clock(shownMs)); }   // live speed tiles of guided mode (?simple)
       $('play').classList.toggle('enough', pass >= 1);
     };
     $('lvl').onchange = $('k').onchange = $('col').onchange = () => { refreshK(); makePlan(); stat(); };
@@ -122,6 +123,7 @@
     const setPause = p => { paused = p; $('pause').textContent = p ? (frames ? 'Resume' : 'Start stream') : 'Pause'; $('ssay').textContent = p ? 'Paused' : 'Stream playing'; stat(); };
     $('fname').textContent = file.name; $('pickview').hidden = true; $('play').hidden = false; $('opts').open = innerWidth > 600;
     $('fchk').textContent = 'Check code ' + meta.sha256.slice(0, 16).match(/.{4}/g).join(' '); $('fchk').title = 'Start of the SHA-256 of the file. The receiver shows the same code for the same file.';
+    if (SIMPLE) { $('play').classList.add('simple'); $('hud').hidden = false; $('opts').open = false; }
     refreshK(); makePlan();   // measured on the visible stage
     draw($('ecode'), entry); { const e = $('ecode'), m = Math.max(1, Math.floor(96 * dpr() / e.width)); e.style.width = e.style.height = (m * e.width / dpr()) + 'px'; }   // whole device pixels per module, like the stage
     draw(cv, entry); fit(cv); setPause(still); $('pause').focus();
@@ -169,13 +171,13 @@
   // demo files, drawn here so the repo needs no binary samples
   // The demo picture is a Full HD photo-like picture of a few hundred KB, so the speed shows; automated tests (?test) use a small one to stay quick.
   function demoPicture() {
-    const k = TEST ? 1 : 2, W = 960 * k, H = 540 * k, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); x.scale(k, k);
+    const k = TEST ? 1 : SIMPLE ? 0.5 : 2, W = 960 * k, H = 540 * k, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); x.scale(k, k);
     const g = x.createLinearGradient(0, 0, 960, 540); g.addColorStop(0, '#2f7bf6'); g.addColorStop(1, '#3ecf8e'); x.fillStyle = g; x.fillRect(0, 0, 960, 540);
     for (let i = 0; i < 40; i++) { x.fillStyle = `hsla(${(i * 37) % 360},80%,70%,.35)`; x.beginPath(); x.arc((i * 211) % 960, (i * 137) % 540, 20 + (i * 13) % 90, 0, 7); x.fill(); }
-    if (!TEST) for (let i = 0; i < 2600; i++) { x.fillStyle = `hsla(${(i * 53) % 360},85%,${45 + (i * 7) % 40}%,.5)`; x.fillRect((i * 389) % 960, (i * 241) % 540, 2 + (i * 5) % 9, 2 + (i * 3) % 9); }   // fine detail, as a photo has
+    if (!TEST && !SIMPLE) for (let i = 0; i < 2600; i++) { x.fillStyle = `hsla(${(i * 53) % 360},85%,${45 + (i * 7) % 40}%,.5)`; x.fillRect((i * 389) % 960, (i * 241) % 540, 2 + (i * 5) % 9, 2 + (i * 3) % 9); }   // fine detail, as a photo has
     x.fillStyle = '#fff'; x.shadowColor = '#0008'; x.shadowBlur = 12; x.font = 'bold 72px system-ui,sans-serif'; x.textAlign = 'center'; x.fillText('Sent by light', 480, 260);
     x.font = '32px system-ui,sans-serif'; x.fillText('QRStream by VYROX · ' + new Date().toISOString().slice(0, 10), 480, 320);
-    return new Promise(r => c.toBlob(b => r(new File([b], 'qrstream-demo.jpg', { type: 'image/jpeg' })), 'image/jpeg', TEST ? 0.82 : 0.9));
+    return new Promise(r => c.toBlob(b => r(new File([b], 'qrstream-demo.jpg', { type: 'image/jpeg' })), 'image/jpeg', TEST ? 0.82 : SIMPLE ? 0.6 : 0.9));
   }
 
   function demoText() {
