@@ -4,7 +4,8 @@
 
 Key facts: speed about 40 to 130 KB/s depending on screen (simulator-measured: 300 KB in 4.5 s on Full HD; not yet measured on physical phones). Files up to 10 MB, best up to a few MB. Own QR encoder/reader and fountain erasure code, zero dependencies.
 
-- [Home, live demo, walkthrough, speed test](https://yeerock.github.io/qrstream/)
+- [Home: scan to receive a demo video](https://yeerock.github.io/qrstream/)
+- [How it works, speed test, specs, FAQ](https://yeerock.github.io/qrstream/more.html)
 - [Sender](https://yeerock.github.io/qrstream/send/)
 - [Receiver](https://yeerock.github.io/qrstream/receive/)
 - [Methodology](https://github.com/yeerock/qrstream/blob/main/docs/METHODOLOGY.md)
