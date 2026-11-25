@@ -39,7 +39,7 @@ option:disabled{color:#7b8794}
 /* 2.5: guided mode (?simple): big code, four live speed tiles, no settings. Used by the demo on the home page. */
 .hud{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px 16px;background:var(--bg);border-top:1px solid #243241}
 .hud .tile{background:#ffffff0d;border-radius:10px;padding:6px 10px;min-width:0}.hud small{display:block;color:var(--mut);font-size:12px}.hud b{display:block;font-size:20px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.simple #opts,.simple #fdet,.simple #fchk,.simple #fok{display:none!important}
+.simple #opts,.simple #fs,.simple #fdet,.simple #fchk,.simple #fok{display:none!important}
 @media (max-width:600px){.hud{grid-template-columns:repeat(2,1fr)}.hud b{font-size:17px}}
 .simple .hud{grid-template-columns:repeat(4,1fr);gap:6px;padding:6px 10px}.simple .hud .tile{padding:4px 8px}.simple .hud small{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.simple .hud b{font-size:16px}
 .simple #bar{padding:6px 12px;gap:6px}.simple #ecode{width:64px;height:64px}.simple #join figcaption{display:none}
@@ -47,3 +47,4 @@ option:disabled{color:#7b8794}
 .simple #close{display:none}.simple #fstat{white-space:normal;font-size:15px;color:var(--fg)}
 
 .simple #pause.primary{flex:1;min-height:52px;font-size:17px}.simple .btns{flex:1}
+.simple #fs{display:none!important}
