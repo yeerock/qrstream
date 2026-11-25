@@ -72,3 +72,6 @@ body:has(.one){height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 .one .side{display:flex;flex-direction:column;justify-content:center}.one h1{font-size:clamp(24px,3.2vw,40px)}.one .moves{grid-template-columns:1fr;margin:16px 0}
 .one .demo{height:100%;min-height:0}.one .demo iframe{height:100%}
 @media (max-width:860px){.one{grid-template-columns:1fr;grid-template-rows:auto 1fr;gap:10px}.one h1{font-size:22px;margin:0}.one .moves{display:none}.one .need{margin:6px 0 0}}
+/* 2.7: the demo never gets squeezed below what 4 codes need; a very short window scrolls instead */
+.one .demo{min-height:520px}@media (max-height:640px){body:has(.one){height:auto;overflow:auto}.one{min-height:auto}}
+@media (min-width:1300px){.one{max-width:1560px;grid-template-columns:minmax(300px,1fr) 2.2fr}}

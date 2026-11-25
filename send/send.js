@@ -66,6 +66,7 @@
     const grids = () => kFix() ? GRIDS.filter(g => g[0] * g[1] === +kSel()) : GRIDS;
     function makePlan() {
       const opts = []; for (const v of VERS) for (const [c, r] of grids()) { const px = modPx(v, c, r); if (px >= 3 && px / dpr() >= 2 && filmable(v, c, r)) opts.push({ v, k: c * r, c, px, cap: c * r * QRTX.symbolsIn(v) * QRTX.SYMBOL }); }
+      if (!opts.length && SIMPLE) for (const v of VERS) for (const [c, r] of grids()) { const px = modPx(v, c, r); if (px >= 2 && filmable(v, c, r)) opts.push({ v, k: c * r, c, px, cap: c * r * QRTX.symbolsIn(v) * QRTX.SYMBOL }); }   // the guided demo always shows 4 codes, as large as the window allows
       if (!opts.length) opts.push({ v: 15, k: 1, c: 1, px: modPx(15, 1), cap: QRTX.symbolsIn(15) * QRTX.SYMBOL });
       // a module must be big enough in device pixels (sharp) and in CSS pixels (physical size: a phone screen has 3 device pixels per CSS pixel)
       const best = (minPx, below = Infinity, css = 0) => opts.filter(o => o.px >= minPx && o.px / dpr() >= css && o.cap < below).sort((a, b) => b.cap - a.cap || a.k - b.k)[0];
@@ -82,7 +83,7 @@
     /** Codes choices that give no readable layout on this screen at this density are switched off; a chosen one that stops fitting goes back to Auto, with a note. */
     let kNote = '', kNoteUntil = 0;
     function refreshK() {
-      const fits = n => smart() ? VERS.some(v => GRIDS.some(([c, r]) => c * r === n && modPx(v, c, r) >= 3 && modPx(v, c, r) / dpr() >= 2 && filmable(v, c, r)))
+      const fits = n => SIMPLE ? true : smart() ? VERS.some(v => GRIDS.some(([c, r]) => c * r === n && modPx(v, c, r) >= 3 && modPx(v, c, r) / dpr() >= 2 && filmable(v, c, r)))
         : GRIDS.some(([c, r]) => c * r === n && modPx(LEVELS[+$('lvl').value][0], c, r) >= 3 && filmable(LEVELS[+$('lvl').value][0], c, r));
       for (const o of $('k').options) if (o.value !== 'auto') o.disabled = !fits(+o.value);
       if (kFix() && $('k').selectedOptions[0].disabled) { kNote = `${kSel()} codes do not fit this screen at this density. Using Auto.`; kNoteUntil = performance.now() + 6000; $('k').value = 'auto'; }
